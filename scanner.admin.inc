@@ -5,6 +5,9 @@
  * Administrative / settings functionality.
  */
 
+// Load the 'pages' file, which contains a 
+include('scanner.inc');
+
 /**
  * The main settings form.
  */
