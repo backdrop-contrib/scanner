@@ -15,11 +15,11 @@ function scanner_with_link_tests_node_presave($node) {
       $node->field_links[LANGUAGE_NONE] = array(
         array(
           'title' => devel_create_greeking(2, TRUE)
-            . ' ' . $node->devel_generate['word']
-            . ' ' . devel_create_greeking(2, TRUE),
+          . ' ' . $node->devel_generate['word']
+          . ' ' . devel_create_greeking(2, TRUE),
           'url' => 'https://example.com/page/'
-            . $node->devel_generate['word']
-            . '/blah',
+          . $node->devel_generate['word']
+          . '/blah',
         ),
       );
     }

@@ -1,5 +1,7 @@
 Search and Replace Scanner 7.x-1.x-dev, 2024-xx-xx
 --------------------------------------------------
+#3151659 by anoopsingh92, DamienMcKenna, VladimirAus, erikaagp, nitin_lama: Fix
+  the errors/warnings reported by PHP_CodeSniffer.
 
 
 Search and Replace Scanner 7.x-1.1, 2018-11-09

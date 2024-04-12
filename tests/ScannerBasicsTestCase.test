@@ -90,7 +90,10 @@ class ScannerBasicsTestCase extends ScannerBaseTestCase {
     // Submit the confirmation form.
     $this->drupalPost(NULL, array(), t('Yes, Continue'));
     $this->assertResponse(200);
-    $this->assertText(strip_tags(t('Replacing [%search] with [%replace] ...', array('%search' => $this->searchWord, '%replace' => $this->replaceWord))));
+    $this->assertText(strip_tags(t('Replacing [%search] with [%replace] ...', array(
+      '%search' => $this->searchWord,
+      '%replace' => $this->replaceWord,
+    ))));
 
     // There should be the same number of items replaced as there were items
     // found the first time.

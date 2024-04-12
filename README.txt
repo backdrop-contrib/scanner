@@ -13,9 +13,9 @@ multiple times in multiple nodes.
 
 II. LIMITATIONS:
 
-1. A user can only have one instance of Search and Replace Scanner running at a time.
-Attempting to open Scanner in two separate windows to perform replacements at the
-same time can lead to unknown errors if you encounter a timeout.
+1. A user can only have one instance of Search and Replace Scanner running at a
+time. Attempting to open Scanner in two separate windows to perform replacements
+at the same time can lead to unknown errors if you encounter a timeout.
 
 2. Only works on sites using a MySQL database.
 
@@ -46,7 +46,8 @@ IV. FEATURES:
 searching for "run" with the whole word option selected will filter out
 "running" and "runs", but will match "run!".
 
-5. You can specify text that should precede or follow the search text in order for a match to be valid.
+5. You can specify text that should precede or follow the search text in
+order for a match to be valid.
 
 6. Can limit search and replace to published nodes only.
 
@@ -62,7 +63,8 @@ to revert a change.
 11. Provides an Undo option that lets you revert all nodes that were udpated in
 a specific replacement action.
 
-12. Updates summary part of text fields that use 'Text area with a summary' widget.
+12. Updates summary part of text fields that use 'Text area with a summary'
+widget.
 
 13. Will dynamically expand PHP's maximum execution time for scripts up to
 10 minutes on servers that support it. This allows complex queries on large

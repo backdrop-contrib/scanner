@@ -29,8 +29,7 @@ abstract class ScannerBaseTestCase extends DrupalWebTestCase {
   }
 
   /**
-   * A word which will be inserted into a number of nodes, just to make sure it
-   * is present.
+   * A simple word placed in content that will be searched for.
    *
    * @var string
    */
@@ -81,8 +80,9 @@ abstract class ScannerBaseTestCase extends DrupalWebTestCase {
    * Generate some sample content.
    *
    * This mirrors some of the logic from devel_generate_content() with the
-   * exception that it specifically tries to ensure the custom word $this->searchWord
-   * is present in the title and/or body field of some content.
+   * exception that it specifically tries to ensure the custom word
+   * $this->searchWord is present in the title and/or body field of some
+   * content.
    *
    * @param int $count
    *   The number of nodes to generate with a minimum of five; defaults to 20.

@@ -8,24 +8,24 @@
 /**
  * Allow additional arguments to be added to the 'or' query.
  *
- * @param db_or $or
+ * @param \db_or $or
  *   The 'or' argument for the main query.
  * @param string $table
  *   The table being queried.
  * @param string $field
  *   The field being queried.
  * @param string $where
- *   Something
+ *   Something.
  * @param bool $binary
  *   If this is querying a binary field, will contain the string ' BINARY'.
  */
-function hook_scanner_query_where(&$or, $table, $field, $where, $binary) {
+function hook_scanner_query_where(\db_or &$or, $table, $field, $where, $binary) {
 }
 
 /**
  * Allow the full query to be adjusted.
  *
- * @param SelectQuery $query
+ * @param \SelectQuery $query
  *   The query being executed.
  * @param array $map
  *   The map of fields.
@@ -34,7 +34,7 @@ function hook_scanner_query_where(&$or, $table, $field, $where, $binary) {
  * @param string $field
  *   The field being queried.
  */
-function hook_scanner_query_alter(&$query, $map, $table, $field) {
+function hook_scanner_query_alter(\SelectQuery &$query, array $map, $table, $field) {
 }
 
 /**
@@ -42,7 +42,7 @@ function hook_scanner_query_alter(&$query, $map, $table, $field) {
  *
  * @param array $matches
  *   Expected to be passed to preg_match_all() as the third argument.
- * @param string $regextr
+ * @param string $regexstr
  *   The regular expression being used for the query.
  * @param object $row
  *   The results row from the search process.
@@ -50,7 +50,8 @@ function hook_scanner_query_alter(&$query, $map, $table, $field) {
  * @return int
  *   The number of matches found in this check.
  */
-function hook_scanner_preg_match_all(&$matches, $regexstr, $row) {
+function hook_scanner_preg_match_all(array &$matches, $regexstr, $row) {
+  return 0;
 }
 
 /**
@@ -63,20 +64,17 @@ function hook_scanner_preg_match_all(&$matches, $regexstr, $row) {
  *   The field being modified.
  * @param array $matches
  *   Expected to be passed to preg_replace() as the third argument.
- * @param string $regextr
- *   The regular expression being used for the query.
  * @param object $row
  *   The results row from the search process.
+ * @param string $regexstr
+ *   The regular expression being used for the query.
  * @param string $replace
  *   The new string being replaced into the $node based upon what is identified
  *   in $matches.
  * @param string $suffix
- *   The
- *
- * @return int
  *   The number of items replaced.
  */
-function hook_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace, $suffix) {
+function hook_scanner_preg_replace(object &$node, $field, array $matches, object $row, $regexstr, $replace, $suffix) {
 }
 
 /**
@@ -88,7 +86,7 @@ function hook_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $r
  * @return array
  *   The list of simple text field types which are supported.
  *
- * @see hook_scanner_fields_alter().
+ * @see hook_scanner_fields_alter()
  */
 function hook_scanner_field_types() {
   return array('text');
@@ -131,5 +129,5 @@ function hook_scanner_field_types() {
  *   value for all text fields found. Second, it is used to prevent infinite
  *   recursion in the case where a field collection is nested within itself.
  */
-function hook_scanner_fields_alter(array &$all_field_records, $node_bundle = NULL, $parent_bundle = NULL, $parents = NULL) {
+function hook_scanner_fields_alter(array &$all_field_records, $node_bundle = NULL, $parent_bundle = NULL, array $parents = NULL) {
 }

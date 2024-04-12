@@ -73,7 +73,10 @@ function scanner_admin_form($form, &$form_state) {
     $key = 'scanner_' . $item['field'] . '_' . $item['table'] . '_' . $item['type'];
     $form['tables'][$key] = array(
       '#type' => 'checkbox',
-      '#title' => filter_xss('<strong>' . $item['type'] . ':</strong> ' . $item['field'], $allowed_values = array('strong', 'p')),
+      '#title' => filter_xss('<strong>' . $item['type'] . ':</strong> ' . $item['field'], $allowed_values = array(
+        'strong',
+        'p',
+      )),
       '#default_value' => variable_get($key, TRUE),
     );
   }

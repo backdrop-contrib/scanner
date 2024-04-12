@@ -74,7 +74,7 @@ class ScannerWithLinkTestCase extends ScannerBasicsTestCase {
     $replace_or = db_or()
       ->condition('field_links_title', '%' . db_like($this->replaceWord) . '%', 'LIKE')
       ->condition('field_links_url', '%' . db_like($this->replaceWord) . '%', 'LIKE');
-    
+
     // Look for 'link' data that contains the search word.
     $pre_search_count = db_select('field_data_field_links', 'l')
       ->fields('l', array('entity_type', 'entity_id', 'delta'))
