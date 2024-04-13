@@ -21,6 +21,9 @@ abstract class ScannerBaseTestCase extends DrupalWebTestCase {
     $modules[] = 'devel';
     $modules[] = 'devel_generate';
 
+    // Make sure the core Text module is installed.
+    $modules[] = 'text';
+
     // Build the site.
     parent::setUp($modules);
 
@@ -132,10 +135,26 @@ abstract class ScannerBaseTestCase extends DrupalWebTestCase {
       }
       else {
         $node->body[LANGUAGE_NONE][0]['value'] = str_replace($this->searchWord, '', $node->body[LANGUAGE_NONE][0]['value']);
+
+      }
+      // Some of the nodes will have the search word in the summary text, that
+      // way there's a different number of records with the summary vs the main
+      // body text.
+      if (mt_rand(0, 5) == 5) {
+        $node->body[LANGUAGE_NONE][0]['summary'] = devel_create_para(3, 1)
+          . '<p>' . $this->searchWord . '</p>'
+          . devel_create_para(3, 1);
+      }
+      // If the summary is defined, make sure it doesn't have the word.
+      elseif (isset($node->body[LANGUAGE_NONE][0]['summary'])) {
+        $node->body[LANGUAGE_NONE][0]['summary'] = str_replace($this->searchWord, '', $node->body[LANGUAGE_NONE][0]['summary']);
       }
 
       // Save the node.
       node_save($node);
+
+      // Get a dump of the node's data, for debugging purposes.
+      $this->verbose(node_load($node->nid));
     }
   }
 

@@ -281,6 +281,10 @@ function _scanner_execute($searchtype = 'search') {
       $query->condition('n.status', '1', '=');
     }
 
+    // Triggers hook_scanner_query_alter().
+    // Allow the query to be modified.
+    drupal_alter('scanner_query', $query, $map, $table, $field);
+
     $result = $query->execute();
     $shutting_down = FALSE;
 

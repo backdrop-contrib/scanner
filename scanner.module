@@ -305,7 +305,7 @@ function text_scanner_query_alter(&$query, $map, $table, $field) {
 
   // A 'summary' value exists for this field.
   if (db_field_exists($table, $summary_field)) {
-    $query->addField('t', $field_summary, 'summary');
+    $query->addField('t', $summary_field, 'summary');
   }
 }
 
@@ -325,11 +325,15 @@ function text_scanner_preg_match_all(&$matches, $regexstr, $row) {
  */
 function text_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace) {
   // Performed on behalf of text.module.
-  if (!empty($row->summary) && !empty($matches)) {
+  $hits = 0;
+
+  if (!empty($matches[1]) && !empty($row->summary)) {
+    $language = field_language('node', $node, $matches[1]);
+
     $old_value = $node->{$matches[1]}[$language][$row->delta]['summary'];
     $new_value = preg_replace($regexstr, $replace, $old_value, -1, $hits);
     $node->{$matches[1]}[$language][$row->delta]['summary'] = $new_value;
-    return $hits;
   }
-  return 0;
+
+  return $hits;
 }
