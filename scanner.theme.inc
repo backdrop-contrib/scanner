@@ -38,9 +38,9 @@ function theme_scanner_item($variables) {
   $item = $variables['item'];
   $item['count'] = $item['count'] > 0 ? $item['count'] : 'One or more';
   $output .= '<li class="scanner-result">';
-  $title = t('#%nid: %title', array(
-    '%nid' => $item['nid'],
-    '%title' => $item['title'],
+  $title = t('#@nid: @title', array(
+    '@nid' => $item['nid'],
+    '@title' => $item['title'],
   ));
   $output .= '<span class="scanner-title">' . l($title, 'node/' . $item['nid']) . '</span><br />';
   $output .= '<span class="scanner-info">[' . $item['count'] . ' matches in ' . $item['type'] . ' ' . $item['field_label'] . ' field:]</span><br />';
