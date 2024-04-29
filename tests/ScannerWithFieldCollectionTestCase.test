@@ -20,6 +20,7 @@ class ScannerWithFieldCollectionTestCase extends ScannerBasicsTestCase {
       'group' => 'scanner',
       'dependencies' => array(
         'devel',
+        'entity',
         'field_collection',
       ),
     );

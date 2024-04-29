@@ -5,8 +5,8 @@
  * Administrative / settings functionality.
  */
 
-// Load the 'pages' file, which contains a 
-include('scanner.inc');
+// The shared functions were moved into a separate file.
+include_once 'scanner.inc';
 
 /**
  * The main settings form.

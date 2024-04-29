@@ -5,6 +5,7 @@ Search and Replace Scanner 7.x-1.x-dev, 2024-xx-xx
 #3440474 by DamienMcKenna: Move functionality into separate pages.inc file.
 #3440512 by DamienMcKenna: Search/replace on summary field doesn't work.
 #3442036 by DamienMcKenna: Search result list is encoded incorrectly.
+#3440527 by DamienMcKenna, jonathan1055, fjgarlin: Gitlab-CI setup.
 
 
 Search and Replace Scanner 7.x-1.1, 2018-11-09

@@ -5,8 +5,8 @@
  * Custom page callbacks for the Scanner module.
  */
 
-// Load the 'pages' file, which contains a 
-include('scanner.inc');
+// The shared functions were moved into a separate file.
+include_once 'scanner.inc';
 
 /**
  * Form constructor for the confirmation form.

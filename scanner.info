@@ -5,8 +5,8 @@ core = 7.x
 configure = admin/config/content/scanner
 
 ; Tests.
+; Note: Dependencies are managed in .gitlab-ci.yml.
 ; Some helper logic.
-test_dependencies[] = devel
 files[] = tests/ScannerBaseTestCase.test
 
 ; Basic admin UI functionality.
@@ -16,9 +16,7 @@ files[] = tests/ScannerUiTestCase.test
 files[] = tests/ScannerBasicsTestCase.test
 
 ; Field Collection module integration.
-test_dependencies[] = field_collection
 files[] = tests/ScannerWithFieldCollectionTestCase.test
 
 ; Link module integration.
-test_dependencies[] = link
 files[] = tests/ScannerWithLinkTestCase.test

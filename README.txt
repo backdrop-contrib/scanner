@@ -78,6 +78,12 @@ V. INSTALLATION AND ADMINISTRATION:
 See INSTALL.txt for installation and administration instructions.
 
 
+DEVELOPMENT NOTES
+
+Development modules are installed for gitlab-ci using lines in `.gitlab-ci.yml`
+due to conflicts in how Drush and Composer download modules.
+
+
 VI. CREDITS:
 
 Version 7.x-1.x by:

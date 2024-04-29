@@ -88,16 +88,11 @@ abstract class ScannerBaseTestCase extends DrupalWebTestCase {
    * content.
    *
    * @param int $count
-   *   The number of nodes to generate with a minimum of five; defaults to 20.
+   *   The number of nodes to generate; defaults to 30.
    * @param string $content_type
    *   The content type to generate; defaults to 'article'.
    */
-  protected function generateSampleContent($count = 20, $content_type = 'article') {
-    // A minimum of five.
-    if ($count < 5) {
-      $count = 5;
-    }
-
+  protected function generateSampleContent($count = 30, $content_type = 'article') {
     // Replace devel_generate_content() so that the content can be customized.
     module_load_include('inc', 'devel_generate');
     module_load_include('inc', 'devel_generate', 'devel_generate.fields');
@@ -114,7 +109,7 @@ abstract class ScannerBaseTestCase extends DrupalWebTestCase {
       );
 
       // A portion of nodes will have the custom word inserted.
-      if (mt_rand(0, 5) == 5) {
+      if (mt_rand(0, 3) == 3) {
         $node->title = devel_create_greeking(2, TRUE)
           . ' ' . $this->searchWord
           . ' ' . devel_create_greeking(2, TRUE);
@@ -128,19 +123,19 @@ abstract class ScannerBaseTestCase extends DrupalWebTestCase {
 
       // Add the custom word to the body field on some records and specifically
       // remove it from the others.
-      if (mt_rand(0, 5) == 5) {
+      if (mt_rand(0, 3) == 3) {
         $node->body[LANGUAGE_NONE][0]['value'] = devel_create_para(3, 1)
           . '<p>' . $this->searchWord . '</p>'
           . devel_create_para(3, 1);
       }
       else {
         $node->body[LANGUAGE_NONE][0]['value'] = str_replace($this->searchWord, '', $node->body[LANGUAGE_NONE][0]['value']);
-
       }
+
       // Some of the nodes will have the search word in the summary text, that
       // way there's a different number of records with the summary vs the main
       // body text.
-      if (mt_rand(0, 5) == 5) {
+      if (mt_rand(0, 3) == 3) {
         $node->body[LANGUAGE_NONE][0]['summary'] = devel_create_para(3, 1)
           . '<p>' . $this->searchWord . '</p>'
           . devel_create_para(3, 1);
