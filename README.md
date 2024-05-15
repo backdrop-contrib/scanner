@@ -1,5 +1,3 @@
-# Lebowski
-
 # Search and Replace Scanner
 
 The Search and Replace Scanner module allows for plain text or regular expression search-and-replace operations across titles, body text, and text content fields on all nodes within your system. This tool is particularly useful for identifying and updating HTML strings that Drupal's standard search might overlook. It's an invaluable asset for correcting widespread typos, updating company names, changing URLs used across multiple nodes, and more.
