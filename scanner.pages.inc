@@ -1,19 +1,10 @@
 <?php
 
-/**
- * @file
- * Custom page callbacks for the Scanner module.
- */
-
 // The shared functions were moved into a separate file.
 include_once 'scanner.inc';
 
 /**
  * Form constructor for the confirmation form.
- *
- * @see block_add_block_form_submit()
- *
- * @ingroup forms
  */
 function scanner_confirm_form($form, &$form_state) {
   $form = array();
@@ -79,13 +70,13 @@ function scanner_confirm_form($form, &$form_state) {
   $form['confirm'] = array(
     '#type' => 'submit',
     '#value' => t('Yes, Continue'),
-    '#submit' => array('scanner_undo_confirm_form_submit'),
+    '#submit' => array('scanner_confirm_form_submit'),
   );
 
   $form['cancel'] = array(
     '#type' => 'submit',
     '#value' => t('No, Cancel'),
-    '#submit' => array('scanner_undo_confirm_form_cancel_submit'),
+    '#submit' => array('scanner_confirm_form_cancel_submit'),
   );
 
   return $form;
@@ -93,8 +84,6 @@ function scanner_confirm_form($form, &$form_state) {
 
 /**
  * Form submission handler for scanner_confirm_form().
- *
- * @see scanner_confirm_form()
  */
 function scanner_confirm_form_submit($form, &$form_state) {
   if ($form_state['values']['op'] == t('Yes, Continue')) {
@@ -107,12 +96,15 @@ function scanner_confirm_form_submit($form, &$form_state) {
 }
 
 /**
+ * Form submission handler for the cancel button in scanner_confirm_form().
+ */
+function scanner_confirm_form_cancel_submit($form, &$form_state) {
+  unset($_SESSION['scanner_status']);
+  $form_state['redirect'] = 'admin/content/scanner';
+}
+
+/**
  * Form constructor for the search and replace form.
- *
- * @see scanner_form_validate()
- * @see scanner_form_submit()
- *
- * @ingroup forms
  */
 function scanner_form($form, &$form_state) {
   $form = array();
@@ -243,8 +235,7 @@ function scanner_form($form, &$form_state) {
   );
 
   $scanner_vocabularies = config_get('scanner.settings', 'scanner_vocabulary', array());
-  $scanner_vocabularies = is_array($scanner_vocabularies) ? array_filter
-  ($scanner_vocabularies) : array();
+  $scanner_vocabularies = is_array($scanner_vocabularies) ? array_filter($scanner_vocabularies) : array();
 
   if (count($scanner_vocabularies)) {
     $vocabularies = taxonomy_get_vocabularies();
@@ -286,12 +277,8 @@ function scanner_form($form, &$form_state) {
   return $form;
 }
 
-
 /**
  * Form validation handler for scanner_form().
- *
- * @see scanner_form()
- * @see scanner_form_submit()
  */
 function scanner_form_validate($form, &$form_state) {
   $search = trim($form_state['values']['search']);
@@ -302,9 +289,6 @@ function scanner_form_validate($form, &$form_state) {
 
 /**
  * Form submission handler for scanner_form().
- *
- * @see scanner_form()
- * @see scanner_form_validate()
  */
 function scanner_form_submit($form, &$form_state) {
   // Save form input into session.
@@ -386,10 +370,6 @@ function scanner_undo_page() {
 
 /**
  * Form constructor for the undo confirmation form.
- *
- * @see scanner_undo_confirm_form_submit()
- *
- * @ingroup forms
  */
 function scanner_undo_confirm_form($form, &$form_state) {
   $undo_id = $_GET['undo_id'];
@@ -406,7 +386,7 @@ function scanner_undo_confirm_form($form, &$form_state) {
     }
   }
 
-  if ($undo->undo_id > 0) {
+  if (isset($undo) && $undo->undo_id > 0) {
     $form['info'] = array(
       '#markup' => '<h2>' . t('Do you want to undo:') . '</h2>' . '<h3>' . t('Searched for:') . '</h3>' . '<p>[<em>' . check_plain($undo->searched) . '</em>]</p>' . '<h3>' . t('Replaced with:') . '</h3>' . '<p>[<em>' . check_plain($undo->replaced) . '</em>]</p>',
     );
@@ -439,70 +419,85 @@ function scanner_undo_confirm_form($form, &$form_state) {
 
 /**
  * Form submission handler for the confirm button.
- *
- * @see scanner_undo_confirm_form()
+ */
+/**
+ * Form submission handler for the confirm button.
  */
 function scanner_undo_confirm_form_submit($form, &$form_state) {
-  // @todo The 'op' element in the form values is deprecated.
-  // Each button can have #validate and #submit functions associated with it.
-  // Thus, there should be one button that submits the form and which invokes
-  // the normal form_id_validate and form_id_submit handlers. Any additional
-  // buttons which need to invoke different validate or submit functionality
-  // should have button-specific functions.
-  if ($form_state['values']['op'] == t('Yes, Continue')) {
+  // Debug: Print form_state values
+  // dpm($form_state['values'], 'form_state values');
 
+  if ($form_state['values']['op'] == t('Yes, Continue')) {
     $query = db_select('scanner', 's');
     $query->fields('s', array('undo_data', 'undone'))
       ->condition('undo_id', $form_state['values']['undo_id'], '=');
 
     $results = $query->execute();
+    // Debug: Print query results
+    // dpm($results, 'query results');
 
-    foreach ($results as $undo) {
-      $undo = $undo;
-    }
+    $undo = $results->fetchObject();
+    // Debug: Print undo data
+    // dpm($undo, 'undo');
 
-    $undos = unserialize($undo->undo_data);
-    $count = NULL;
+    if ($undo) {
+      $undos = unserialize($undo->undo_data);
+      $count = 0;
 
-    foreach ($undos as $nid => $sandr_event) {
+      foreach ($undos as $nid => $sandr_event) {
+        // Debug: Print each undo event
+      //  dpm($sandr_event, 'sandr_event');
 
-      if ($undo->undone == 0) {
-        $vid = $sandr_event['old_vid'];
-        $undone = 1;
+        if ($undo->undone == 0) {
+          $vid = $sandr_event['old_vid'];
+          $undone = 1;
+        } else {
+          $vid = $sandr_event['new_vid'];
+          $undone = 0;
+        }
+
+        $node = node_load($nid, $vid);
+        // Debug: Print node
+        // dpm($node, 'node');
+
+        if ($node) {
+          $node->revision = TRUE;
+          $node->log = t('Copy of the revision from %date via Search and Replace Undo', array('%date' => format_date($node->revision_timestamp)));
+          node_save($node);
+          $count++;
+        }
       }
-      else {
-        $vid = $sandr_event['new_vid'];
-        $undone = 0;
-      }
 
-      $node = node_load($nid, $vid);
-
-      $node->revision = TRUE;
-      $node->log = t('Copy of the revision from %date via Search and Replace Undo', array('%date' => format_date($node->revision_timestamp)));
-      node_save($node);
-      ++$count;
+      backdrop_set_message($count . ' ' . t('Nodes reverted'));
+      db_update('scanner')
+        ->fields(array(
+          'undone' => $undone,
+        ))
+        ->condition('undo_id', $form_state['values']['undo_id'])
+        ->execute();
+    } else {
+      backdrop_set_message(t('No undo data found for the given undo ID.'), 'error');
     }
-
-    backdrop_set_message($count . ' ' . t('Nodes reverted'));
-    // Update the 'undone' status.
-    db_update('scanner')
-      ->fields(array(
-        'undone' => $undone,
-      ))
-      ->condition('undo_id', $form_state['values']['undo_id'])
-      ->execute();
-  }
-  else {
+  } else {
     backdrop_set_message(t('Undo / Redo canceled'));
   }
 
   // Debug: Print node ID
-  dpm($node->nid, 'node nid');
+  if (isset($node)) {
+  // dpm($node->nid, 'node nid');
+  }
 
   $form_state['redirect'] = 'admin/content/scanner/undo';
-  $form_state['nid'] = $node->nid;
 }
 
+
+/**
+ * Form submission handler for the cancel button.
+ */
+function scanner_undo_confirm_form_cancel_submit($form, &$form_state) {
+  backdrop_set_message(t('Undo / Redo canceled'));
+  $form_state['redirect'] = 'admin/content/scanner/undo';
+}
 
 /**
  * Menu callback; presents the scan form and results.
@@ -510,14 +505,11 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
 function scanner_view() {
   $output = '';
 
-  // Using set_html_head because it seems unnecessary to load a separate css
-  // file for just two simple declarations.
   backdrop_add_css('
-      #scanner-form .form-submit { margin-top:0; }
-      #scanner-form .form-item { margin-bottom:0; }
-    ', array('type' => 'inline'));
+    #scanner-form .form-submit { margin-top:0; }
+    #scanner-form .form-item { margin-bottom:0; }
+  ', array('type' => 'inline'));
 
-  // Javascript checks to make sure user has entered some search text.
   backdrop_add_js("
     jQuery(document).ready(function() {
       var searchfield = jQuery('#edit-search');
@@ -572,7 +564,6 @@ function scanner_view() {
     $output = backdrop_render($scanner_form);
     $output .= $results;
 
-    // Clear any old search form input.
     unset($_SESSION['scanner_search']);
     unset($_SESSION['scanner_replace']);
     unset($_SESSION['scanner_preceded']);
@@ -583,7 +574,6 @@ function scanner_view() {
     unset($_SESSION['scanner_pathauto']);
     unset($_SESSION['scanner_regex']);
     unset($_SESSION['scanner_terms']);
-    // Clear old status.
     unset($_SESSION['scanner_status']);
 
     return $output;
