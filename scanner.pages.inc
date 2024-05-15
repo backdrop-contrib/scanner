@@ -18,8 +18,8 @@ include_once 'scanner.inc';
 function scanner_confirm_form($form, &$form_state) {
   $form = array();
 
-  $form['#attached']['js'][] = drupal_get_path('module', 'scanner') . '/scanner.js';
-  $form['#attached']['css'][] = drupal_get_path('module', 'scanner') . '/scanner.css';
+  $form['#attached']['js'][] = backdrop_get_path('module', 'scanner') . '/scanner.js';
+  $form['#attached']['css'][] = backdrop_get_path('module', 'scanner') . '/scanner.css';
 
   $search    = $_SESSION['scanner_search'];
   $replace   = $_SESSION['scanner_replace'];
@@ -53,7 +53,7 @@ function scanner_confirm_form($form, &$form_state) {
   $msg .= ' [' . check_plain($replace) . ']';
   $msg .= '</div>';
   if ($replace === '') {
-    $msg .= ' <span class="warning">' . t('This will delete any occurences of the search terms!') . '</span>';
+    $msg .= ' <span class="warning">' . t('This will delete any occurrences of the search terms!') . '</span>';
   }
   $msg .= '</div>';
   $msg .= '<div class="scanner-confirm">';
@@ -79,14 +79,13 @@ function scanner_confirm_form($form, &$form_state) {
   $form['confirm'] = array(
     '#type' => 'submit',
     '#value' => t('Yes, Continue'),
-    // See suffix in cancel button element.
-    '#prefix' => '<div class="scanner-buttons">',
+    '#submit' => array('scanner_undo_confirm_form_submit'),
   );
+
   $form['cancel'] = array(
     '#type' => 'submit',
     '#value' => t('No, Cancel'),
-    // See prefix in confirm button element.
-    '#suffix' => '</div>',
+    '#submit' => array('scanner_undo_confirm_form_cancel_submit'),
   );
 
   return $form;
@@ -98,16 +97,9 @@ function scanner_confirm_form($form, &$form_state) {
  * @see scanner_confirm_form()
  */
 function scanner_confirm_form_submit($form, &$form_state) {
-  // @todo The 'op' element in the form values is deprecated.
-  // Each button can have #validate and #submit functions associated with it.
-  // Thus, there should be one button that submits the form and which invokes
-  // the normal form_id_validate and form_id_submit handlers. Any additional
-  // buttons which need to invoke different validate or submit functionality
-  // should have button-specific functions.
   if ($form_state['values']['op'] == t('Yes, Continue')) {
     $_SESSION['scanner_status'] = SCANNER_STATUS_GO_REPLACE;
-  }
-  else {
+  } else {
     unset($_SESSION['scanner_status']);
   }
 
@@ -127,41 +119,36 @@ function scanner_form($form, &$form_state) {
 
   if (isset($_SESSION['scanner_search'])) {
     $search = $_SESSION['scanner_search'];
-  }
-  else {
+  } else {
     $search = NULL;
   }
 
   if (isset($_SESSION['scanner_replace'])) {
     $replace = $_SESSION['scanner_replace'];
-  }
-  else {
+  } else {
     $replace = NULL;
   }
   if (isset($_SESSION['scanner_preceded'])) {
     $preceded = $_SESSION['scanner_preceded'];
-  }
-  else {
+  } else {
     $preceded = NULL;
   }
 
   if (isset($_SESSION['scanner_followed'])) {
     $followed = $_SESSION['scanner_followed'];
-  }
-  else {
+  } else {
     $followed = NULL;
   }
 
-  $mode = $_SESSION['scanner_mode'] ?? variable_get('scanner_mode', 0);
-  $wholeword = $_SESSION['scanner_wholeword'] ?? variable_get('scanner_wholeword', 0);
-  $regex = $_SESSION['scanner_regex'] ?? variable_get('scanner_regex', 0);
-  $published = $_SESSION['scanner_published'] ?? variable_get('scanner_published', 1);
-  $pathauto = $_SESSION['scanner_pathauto'] ?? variable_get('scanner_pathauto', 1);
+  $mode = $_SESSION['scanner_mode'] ?? config_get('scanner.settings', 'scanner_mode', 0);
+  $wholeword = $_SESSION['scanner_wholeword'] ?? config_get('scanner.settings', 'scanner_wholeword', 0);
+  $regex = $_SESSION['scanner_regex'] ?? config_get('scanner.settings', 'scanner_regex', 0);
+  $published = $_SESSION['scanner_published'] ?? config_get('scanner.settings', 'scanner_published', 1);
+  $pathauto = $_SESSION['scanner_pathauto'] ?? config_get('scanner.settings', 'scanner_pathauto', 1);
 
   if (isset($_SESSION['scanner_terms'])) {
     $terms = $_SESSION['scanner_terms'];
-  }
-  else {
+  } else {
     $terms = NULL;
   }
 
@@ -209,7 +196,7 @@ function scanner_form($form, &$form_state) {
     '#type' => 'fieldset',
     '#title' => t('Surrounding Text'),
     '#collapsible' => FALSE,
-    '#description' => t('You can limit matches by providing the text that should appear immediately before or after the search text. Remember to account for spaces.  Note: Case sensitivity and regular expression options will all apply here, too. Whole word is not recommended.'),
+    '#description' => t('You can limit matches by providing the text that should appear immediately before or after the search text. Remember to account for spaces. Note: Case sensitivity and regular expression options will all apply here, too. Whole word is not recommended.'),
   );
   $form['options']['surrounding']['preceded'] = array(
     '#type' => 'textfield',
@@ -255,21 +242,31 @@ function scanner_form($form, &$form_state) {
     '#description' => t("Prevent custom URL aliases from being overwritten with ones generated from Path Auto's URL alias patterns."),
   );
 
-  $scanner_vocabularies = array_filter(variable_get('scanner_vocabulary', array()));
+  $scanner_vocabularies = config_get('scanner.settings', 'scanner_vocabulary', array());
+  $scanner_vocabularies = is_array($scanner_vocabularies) ? array_filter
+  ($scanner_vocabularies) : array();
 
   if (count($scanner_vocabularies)) {
     $vocabularies = taxonomy_get_vocabularies();
     $options = array();
 
-    foreach ($vocabularies as $vid => $vocabulary) {
-      if (in_array($vid, $scanner_vocabularies)) {
-        $tree = taxonomy_get_tree($vid);
-        if ($tree && (count($tree) > 0)) {
+    foreach ($vocabularies as $vocabulary) {
+      if (in_array($vocabulary->machine_name, $scanner_vocabularies)) {
+        // Ensure the machine name is correctly passed to the function
+        $tree = taxonomy_get_tree($vocabulary->machine_name);
+
+        if ($tree && count($tree) > 0) {
           $options[$vocabulary->name] = array();
           foreach ($tree as $term) {
             $options[$vocabulary->name][$term->tid] = str_repeat('-', $term->depth) . $term->name;
           }
+        } else {
+          $options[$vocabulary->name] = array(
+            '#markup' => t('No terms available for vocabulary: @vocabulary', ['@vocabulary' => $vocabulary->name])
+          );
         }
+      } else {
+        backdrop_set_message(t('Vocabulary machine name not found in scanner vocabularies: @machine_name', ['@machine_name' => $vocabulary->machine_name]), 'warning');
       }
     }
 
@@ -280,10 +277,15 @@ function scanner_form($form, &$form_state) {
       '#default_value' => $terms,
       '#multiple' => TRUE,
     );
+  } else {
+    $form['options']['terms'] = array(
+      '#markup' => t('No vocabularies selected for scanning. Please update your settings.')
+    );
   }
 
   return $form;
 }
+
 
 /**
  * Form validation handler for scanner_form().
@@ -308,9 +310,7 @@ function scanner_form_submit($form, &$form_state) {
   // Save form input into session.
   $_SESSION['scanner_search']   = $form_state['values']['search'];
   $_SESSION['scanner_preceded'] = $form_state['values']['preceded'];
-  // $_SESSION['scanner_notpreceded'] = $form_state['values']['notpreceded'];
   $_SESSION['scanner_followed'] = $form_state['values']['followed'];
-  // $_SESSION['scanner_notfollowed'] = $form_state['values']['notfollowed'];
   $_SESSION['scanner_mode']      = $form_state['values']['mode'];
   $_SESSION['scanner_wholeword'] = $form_state['values']['wholeword'];
   $_SESSION['scanner_regex']     = $form_state['values']['regex'];
@@ -321,16 +321,9 @@ function scanner_form_submit($form, &$form_state) {
   }
   $_SESSION['scanner_replace'] = $form_state['values']['replace'];
 
-  // @todo The 'op' element in the form values is deprecated.
-  // Each button can have #validate and #submit functions associated with it.
-  // Thus, there should be one button that submits the form and which invokes
-  // the normal form_id_validate and form_id_submit handlers. Any additional
-  // buttons which need to invoke different validate or submit functionality
-  // should have button-specific functions.
   if ($form_state['values']['op'] == t('Replace')) {
     $_SESSION['scanner_status'] = SCANNER_STATUS_GO_CONFIRM;
-  }
-  else {
+  } else {
     $_SESSION['scanner_status'] = SCANNER_STATUS_GO_SEARCH;
   }
   $form_state['redirect'] = 'admin/content/scanner';
@@ -368,8 +361,7 @@ function scanner_undo_page() {
       $operation = l(t('Redo'), 'admin/content/scanner/undo/confirm', array(
         'query' => array('undo_id' => $sandr->undo_id),
       ));
-    }
-    else {
+    } else {
       $operation = l(t('Undo'), 'admin/content/scanner/undo/confirm', array(
         'query' => array('undo_id' => $sandr->undo_id),
       ));
@@ -412,7 +404,6 @@ function scanner_undo_confirm_form($form, &$form_state) {
     foreach ($result as $undo) {
       $undo = $undo;
     }
-
   }
 
   if ($undo->undo_id > 0) {
@@ -428,17 +419,18 @@ function scanner_undo_confirm_form($form, &$form_state) {
     $form['confirm'] = array(
       '#type' => 'submit',
       '#value' => t('Yes, Continue'),
+      '#submit' => array('scanner_undo_confirm_form_submit'),
     );
 
     $form['cancel'] = array(
       '#type' => 'submit',
       '#value' => t('No, Cancel'),
+      '#submit' => array('scanner_undo_confirm_form_cancel_submit'),
     );
 
-  }
-  else {
+  } else {
     $form['info'] = array(
-      '#value' => '<h2>' . t('No undo event was found') . '</h2>',
+      '#markup' => '<h2>' . t('No undo event was found') . '</h2>',
     );
   }
 
@@ -446,7 +438,7 @@ function scanner_undo_confirm_form($form, &$form_state) {
 }
 
 /**
- * Form submission handler for scanner_undo_confirm_form().
+ * Form submission handler for the confirm button.
  *
  * @see scanner_undo_confirm_form()
  */
@@ -458,6 +450,7 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
   // buttons which need to invoke different validate or submit functionality
   // should have button-specific functions.
   if ($form_state['values']['op'] == t('Yes, Continue')) {
+
     $query = db_select('scanner', 's');
     $query->fields('s', array('undo_data', 'undone'))
       ->condition('undo_id', $form_state['values']['undo_id'], '=');
@@ -472,6 +465,7 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
     $count = NULL;
 
     foreach ($undos as $nid => $sandr_event) {
+
       if ($undo->undone == 0) {
         $vid = $sandr_event['old_vid'];
         $undone = 1;
@@ -482,15 +476,15 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
       }
 
       $node = node_load($nid, $vid);
+
       $node->revision = TRUE;
       $node->log = t('Copy of the revision from %date via Search and Replace Undo', array('%date' => format_date($node->revision_timestamp)));
       node_save($node);
       ++$count;
     }
 
-    drupal_set_message($count . ' ' . t('Nodes reverted'));
-    // @todo Please review the conversion of this statement to the D7 database
-    // API syntax.
+    backdrop_set_message($count . ' ' . t('Nodes reverted'));
+    // Update the 'undone' status.
     db_update('scanner')
       ->fields(array(
         'undone' => $undone,
@@ -499,12 +493,16 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
       ->execute();
   }
   else {
-    drupal_set_message(t('Undo / Redo canceled'));
+    backdrop_set_message(t('Undo / Redo canceled'));
   }
+
+  // Debug: Print node ID
+  dpm($node->nid, 'node nid');
 
   $form_state['redirect'] = 'admin/content/scanner/undo';
   $form_state['nid'] = $node->nid;
 }
+
 
 /**
  * Menu callback; presents the scan form and results.
@@ -512,15 +510,15 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
 function scanner_view() {
   $output = '';
 
-  // Using set_html_head because it seems unecessary to load a separate css
+  // Using set_html_head because it seems unnecessary to load a separate css
   // file for just two simple declarations.
-  drupal_add_css('
+  backdrop_add_css('
       #scanner-form .form-submit { margin-top:0; }
       #scanner-form .form-item { margin-bottom:0; }
     ', array('type' => 'inline'));
 
   // Javascript checks to make sure user has entered some search text.
-  drupal_add_js("
+  backdrop_add_js("
     jQuery(document).ready(function() {
       var searchfield = jQuery('#edit-search');
       jQuery('input[type=submit][value=" . str_replace('\'', '\\\'', t('Search')) . "]').click(function() {
@@ -543,42 +541,35 @@ function scanner_view() {
 
   if (isset($_SESSION['scanner_search'])) {
     $search = $_SESSION['scanner_search'];
-  }
-  else {
+  } else {
     $search = NULL;
   }
 
   if (isset($_SESSION['scanner_status'])) {
     $status = $_SESSION['scanner_status'];
-  }
-  else {
+  } else {
     $status = NULL;
   }
 
   if (!is_null($search) && $status >= SCANNER_STATUS_GO_SEARCH) {
     if ($status == SCANNER_STATUS_GO_CONFIRM) {
-      drupal_goto('admin/content/scanner/scan/confirm');
-    }
-    elseif ($status == SCANNER_STATUS_GO_REPLACE) {
+      backdrop_goto('admin/content/scanner/scan/confirm');
+    } elseif ($status == SCANNER_STATUS_GO_REPLACE) {
       $resulttxt = '<a name="results"></a>' . t('Replacement Results');
       $results = _scanner_execute('replace');
-    }
-    else {
+    } else {
       $resulttxt = t('Search Results');
       $results = _scanner_execute('search');
     }
 
-    // @todo Please change this theme call to use an associative array for
-    // the $variables parameter.
     if ($results) {
       $results = '<a name="results"></a><div><h2>' . $resulttxt . '</h2>' . $results;
-    }
-    else {
+    } else {
       $results = t('Your search yielded no results.');
     }
 
-    $scanner_form = drupal_get_form('scanner_form');
-    $output = drupal_render($scanner_form);
+    $scanner_form = backdrop_get_form('scanner_form');
+    $output = backdrop_render($scanner_form);
     $output .= $results;
 
     // Clear any old search form input.
@@ -598,8 +589,8 @@ function scanner_view() {
     return $output;
   }
 
-  $scanner_form = drupal_get_form('scanner_form');
-  $output = drupal_render($scanner_form);
+  $scanner_form = backdrop_get_form('scanner_form');
+  $output = backdrop_render($scanner_form);
 
   return $output;
 }

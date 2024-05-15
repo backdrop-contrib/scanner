@@ -1,0 +1,11 @@
+{
+    "name": "scanner.settings",
+    "data": {
+        "scanner_mode": false,
+        "scanner_wholeword": false,
+        "scanner_regex": false,
+        "scanner_published": true,
+        "scanner_pathauto": true,
+        "scanner_vocabulary": []
+    }
+}

@@ -29,7 +29,7 @@ function _scanner_change_env($setting, $value, $verbose = FALSE) {
   if ($old_value != $value && $old_value != 0) {
     if (ini_set($setting, $value)) {
       if ($verbose) {
-        drupal_set_message(t('%setting changed from %old_value to %value.', array(
+        backdrop_set_message(t('%setting changed from %old_value to %value.', array(
           '%setting' => $setting,
           '%old_value' => $old_value,
           '%value' => $value,
@@ -39,7 +39,7 @@ function _scanner_change_env($setting, $value, $verbose = FALSE) {
     }
     else {
       if ($verbose) {
-        drupal_set_message(t('%setting could not be changed from %old_value to %value.', array(
+        backdrop_set_message(t('%setting could not be changed from %old_value to %value.', array(
           '%setting' => $setting,
           '%old_value' => $old_value,
           '%value' => $value,
@@ -48,6 +48,7 @@ function _scanner_change_env($setting, $value, $verbose = FALSE) {
       return FALSE;
     }
   }
+  return FALSE;
 }
 
 /**
@@ -110,38 +111,37 @@ function _scanner_execute($searchtype = 'search') {
   $expanded = FALSE;
 
   // Get process and undo data if saved from timeout.
-  $processed = variable_get('scanner_partially_processed_' . $user->uid, array());
-  $undo_data = variable_get('scanner_partial_undo_' . $user->uid, array());
+  $config = config('scanner.settings');
+  $processed = $config->get('scanner_partially_processed_' . $user->uid, []);
+  $undo_data = $config->get('scanner_partial_undo_' . $user->uid, []);
 
-  // Get the field collection field to use when joining revisions, based on
-  // whether the current version of the field_collection module has revisions
-  // enabled (7.x-1.0-beta5)
-  $fc_revision_field = drupal_get_schema('field_collection_item_revision') ? 'revision_id' : 'value';
+  // Get the field collection field to use when joining revisions.
+  $fc_revision_field = db_table_exists('field_collection_item_revision') ? 'revision_id' : 'value';
 
   unset($_SESSION['scanner_status']);
-  $search   = $_SESSION['scanner_search'];
-  $replace  = $_SESSION['scanner_replace'];
+  $search = $_SESSION['scanner_search'];
+  $replace = $_SESSION['scanner_replace'];
   $preceded = $_SESSION['scanner_preceded'];
   $followed = $_SESSION['scanner_followed'];
-  $mode     = $_SESSION['scanner_mode'];
+  $mode = $_SESSION['scanner_mode'];
   // Case sensitivity flag for use in php preg_search and preg_replace.
-  $flag      = $mode ? NULL : 'i';
+  $flag = $mode ? NULL : 'i';
   $wholeword = $_SESSION['scanner_wholeword'];
-  $regex     = $_SESSION['scanner_regex'];
+  $regex = $_SESSION['scanner_regex'];
   $published = $_SESSION['scanner_published'];
-  $pathauto  = $_SESSION['scanner_pathauto'];
-  $terms     = $_SESSION['scanner_terms'] ?? NULL;
-  $results   = NULL;
+  $pathauto = $_SESSION['scanner_pathauto'];
+  $terms = $_SESSION['scanner_terms'] ?? NULL;
+  $results = NULL;
 
   if ($searchtype == 'search') {
-    drupal_set_message(t('Searching for: [%search] ...', array('%search' => $search)));
+    backdrop_set_message(t('Searching for: [%search] ...', ['%search' => $search]));
   }
   // Searchtype == 'replace'.
   else {
-    drupal_set_message(t('Replacing [%search] with [%replace] ...', array(
+    backdrop_set_message(t('Replacing [%search] with [%replace] ...', [
       '%search' => $search,
       '%replace' => $replace,
-    )));
+    ]));
   }
 
   $preceded_php = '';
@@ -164,19 +164,16 @@ function _scanner_execute($searchtype = 'search') {
     $where = "[[:<:]]" . $preceded . $search . $followed . "[[:>:]]";
     $search_php = '\b' . $preceded_php . $search . $followed_php . '\b';
   }
-
   // Case 2.
   elseif ($wholeword && !$regex) {
     $where = "[[:<:]]" . $preceded . addcslashes($search, SCANNER_REGEX_CHARS) . $followed . "[[:>:]]";
     $search_php = '\b' . $preceded_php . addcslashes($search, SCANNER_REGEX_CHARS) . $followed_php . '\b';
   }
-
   // Case 3.
   elseif (!$wholeword && $regex) {
     $where = $preceded . $search . $followed;
     $search_php = $preceded_php . $search . $followed_php;
   }
-
   // Case 4.
   // !wholeword and !regex:
   else {
@@ -187,8 +184,8 @@ function _scanner_execute($searchtype = 'search') {
   // If terms selected, then put together extra join and where clause.
   $join = '';
   if (is_array($terms) && count($terms)) {
-    $terms_where = array();
-    $terms_params = array();
+    $terms_where = [];
+    $terms_params = [];
     foreach ($terms as $term) {
       $terms_where[] = 'tn.tid = %d';
       $terms_params[] = $term;
@@ -212,7 +209,7 @@ function _scanner_execute($searchtype = 'search') {
     // Allow the table suffix to be altered.
     $suffix = 'value';
     // Trigger hook_scanner_field_suffix_alter().
-    drupal_alter('scanner_field_suffix', $suffix, $map);
+    backdrop_alter('scanner_field_suffix', $suffix, $map);
 
     $query = db_select($table, 't');
     if ($table == 'node_revision') {
@@ -226,7 +223,8 @@ function _scanner_execute($searchtype = 'search') {
     if (!empty($field_collection_parents)) {
       $cnt_fc = count($field_collection_parents);
 
-      // Loop thru the parents backwards, so that the joins can all be created.
+      // Loop through the parents backwards, so that the joins can all be
+      // created.
       for ($i = $cnt_fc; $i > 0; $i--) {
         $fc_this = $field_collection_parents[$i - 1];
         $fc_alias = 'fc' . ($i - 1);
@@ -234,15 +232,15 @@ function _scanner_execute($searchtype = 'search') {
         $prev_alias = ($i == $cnt_fc) ? 't' : ('fc' . $i);
         $query->join($fc_table, $fc_alias,
           format_string('!PREV_ALIAS.entity_id = !FC_ALIAS.!FC_THIS_value AND !PREV_ALIAS.revision_id = !FC_ALIAS.!FC_THIS_!FC_REV',
-            array(
+            [
               '!FC_ALIAS' => $fc_alias,
               '!FC_THIS' => $fc_this,
               '!PREV_ALIAS' => $prev_alias,
               '!FC_REV' => $fc_revision_field,
-            )));
+            ]));
         if ($i == 1) {
           $query->join('node', 'n',
-            format_string('!FC_ALIAS.entity_id = n.nid AND !FC_ALIAS.revision_id = n.vid', array('!FC_ALIAS' => $fc_alias)));
+            format_string('!FC_ALIAS.entity_id = n.nid AND !FC_ALIAS.revision_id = n.vid', ['!FC_ALIAS' => $fc_alias]));
         }
       }
     }
@@ -261,9 +259,9 @@ function _scanner_execute($searchtype = 'search') {
     $query->addField('t', $field, 'content');
 
     if ($table != 'node_revision') {
-      $query->fields('t', array('delta'));
+      $query->fields('t', ['delta']);
     }
-    $query->fields('n', array('nid', 'title'));
+    $query->fields('n', ['nid', 'title']);
 
     $query->condition('n.type', $type, '=');
 
@@ -283,7 +281,7 @@ function _scanner_execute($searchtype = 'search') {
 
     // Triggers hook_scanner_query_alter().
     // Allow the query to be modified.
-    drupal_alter('scanner_query', $query, $map, $table, $field);
+    backdrop_alter('scanner_query', $query, $map, $table, $field);
 
     $result = $query->execute();
     $shutting_down = FALSE;
@@ -298,7 +296,7 @@ function _scanner_execute($searchtype = 'search') {
 
       $content = $row->content;
       $summary = $row->summary ?? '';
-      $matches = array();
+      $matches = [];
       $text = '';
 
       // If the max_execution_time setting has been set then check for possible
@@ -312,7 +310,7 @@ function _scanner_execute($searchtype = 'search') {
             $verbose = FALSE;
           }
           if (_scanner_change_env('max_execution_time', '600', $verbose)) {
-            drupal_set_message(t('Default max_execution_time too small and changed to 10 minutes.'), 'error');
+            backdrop_set_message(t('Default max_execution_time too small and changed to 10 minutes.'), 'error');
             $max_execution_time = 600;
           }
           $expanded = TRUE;
@@ -320,13 +318,14 @@ function _scanner_execute($searchtype = 'search') {
         // If expanded environment still running out of time, shutdown process.
         else {
           $shutting_down = TRUE;
-          variable_set('scanner_partially_processed_' . $user->uid, $processed);
-          variable_set('scanner_partial_undo_' . $user->uid, $undo_data);
+          $config->set('scanner_partially_processed_' . $user->uid, $processed);
+          $config->set('scanner_partial_undo_' . $user->uid, $undo_data);
+          $config->save();
           if ($searchtype == 'search') {
-            drupal_set_message(t('Did not have enough time to complete search.'), 'error');
+            backdrop_set_message(t('Did not have enough time to complete search.'), 'error');
           }
           else {
-            drupal_set_message(t('Did not have enough time to complete. Please re-submit replace'), 'error');
+            backdrop_set_message(t('Did not have enough time to complete. Please re-submit replace'), 'error');
           }
           break 2;
         }
@@ -339,14 +338,14 @@ function _scanner_execute($searchtype = 'search') {
 
       // Search.
       if ($searchtype == 'search') {
-        $matches = array('0' => array());
+        $matches = ['0' => []];
         $hits = 0;
 
         // Assign matches in the base text field to $matches[0].
         // Trigger hook_scanner_preg_match_all().
         foreach (module_implements('scanner_preg_match_all') as $module_name) {
           $function = $module_name . '_scanner_preg_match_all';
-          $new_matches = array();
+          $new_matches = [];
           $hits += $function($new_matches, $regexstr, $row);
           $matches = array_merge($matches, $new_matches);
         }
@@ -393,7 +392,7 @@ function _scanner_execute($searchtype = 'search') {
             . '</div>';
         }
 
-        $results[] = array(
+        $results[] = [
           'title' => $row->title,
           'type' => $type,
           'count' => $hits,
@@ -401,7 +400,7 @@ function _scanner_execute($searchtype = 'search') {
           'field_label' => $field_label,
           'nid' => $row->nid,
           'text' => $text,
-        );
+        ];
       }
 
       // Replace (and check to see if already processed).
@@ -416,8 +415,8 @@ function _scanner_execute($searchtype = 'search') {
           if (!empty($id)) {
             module_load_include('inc', 'pathauto');
             $uri = entity_uri('node', $node);
-            $path = drupal_get_path_alias($uri['path']);
-            $pathauto_alias = pathauto_create_alias('node', 'return', $uri['path'], array('node' => $node), $bundle);
+            $path = backdrop_get_path_alias($uri['path']);
+            $pathauto_alias = pathauto_create_alias('node', 'return', $uri['path'], ['node' => $node], $bundle);
             $node->path['pathauto'] = ($path != $uri['path'] && $path == $pathauto_alias);
           }
         }
@@ -451,14 +450,14 @@ function _scanner_execute($searchtype = 'search') {
                 }
 
                 if ($fc_hits > 0) {
-                  $results[] = array(
+                  $results[] = [
                     'title' => $node->title,
                     'type' => $node->type,
                     'count' => $fc_hits,
                     'field' => $field,
                     'field_label' => $field_label,
                     'nid' => $node->nid,
-                  );
+                  ];
                 }
               }
 
@@ -492,14 +491,14 @@ function _scanner_execute($searchtype = 'search') {
           }
 
           // Update the counter.
-          $results[] = array(
+          $results[] = [
             'title' => $node->title,
             'nid' => $node->nid,
             'type' => $node->type,
             'count' => $hits,
             'field' => $field,
             'field_label' => $field_label,
-          );
+          ];
         }
 
         // A revision only created for the first change of the node. Subsequent
@@ -507,11 +506,11 @@ function _scanner_execute($searchtype = 'search') {
         // @todo Need a better way of handling this.
         if (!isset($undo_data[$node->nid]['new_vid'])) {
           $node->revision = TRUE;
-          $node->log = t('@name replaced %search with %replace via Scanner Search and Replace module.', array(
+          $node->log = t('@name replaced %search with %replace via Scanner Search and Replace module.', [
             '@name' => $user->name,
             '%search' => $search,
             '%replace' => $replace,
-          ));
+          ]);
           $undo_data[$node->nid]['old_vid'] = $node->vid;
         }
         node_save($node);
@@ -528,29 +527,30 @@ function _scanner_execute($searchtype = 'search') {
 
   // If completed.
   if (isset($shutting_down) && !$shutting_down) {
-    variable_del('scanner_partially_processed_' . $user->uid);
-    variable_del('scanner_partial_undo_' . $user->uid);
+    $config->clear('scanner_partially_processed_' . $user->uid);
+    $config->clear('scanner_partial_undo_' . $user->uid);
+    $config->save();
   }
 
   if ($searchtype == 'search') {
-    return theme('scanner_results', array('results' => $results));
+    return theme('scanner_results', ['results' => $results]);
   }
   // Searchtype == 'replace'.
   else {
     if (count($undo_data) && !$shutting_down) {
       db_insert('scanner')
-        ->fields(array(
+        ->fields([
           'undo_data' => serialize($undo_data),
           'undone' => 0,
           'searched' => $search,
           'replaced' => $replace,
           'count' => count($undo_data),
           'time' => REQUEST_TIME,
-        ))
+        ])
         ->execute();
     }
 
-    return theme('scanner_replace_results', array('results' => $results));
+    return theme('scanner_replace_results', ['results' => $results]);
   }
 }
 
@@ -560,6 +560,21 @@ function _scanner_execute($searchtype = 'search') {
  * @return array
  *   List of all fields, each of which is an array containing relevant data
  *   used for diplaying/querying.
+ */
+/**
+ * Get all text fields.
+ *
+ * @return array
+ *   List of all fields, each of which is an array containing relevant data
+ *   used for displaying/querying.
+ */
+
+/**
+ * Get all text fields.
+ *
+ * @return array
+ *   List of all fields, each of which is an array containing relevant data
+ *   used for displaying/querying.
  */
 function _scanner_get_all_tables_map() {
   $tables_map = array();
@@ -574,40 +589,25 @@ function _scanner_get_all_tables_map() {
         'table' => 'node_revision',
       );
     }
-  }
 
-  $all_field_records = array();
-
-  // Trigger hook_scanner_field_types().
-  foreach (module_invoke_all('scanner_field_types') as $field_type) {
-    $query = db_select('field_config_instance', 'fci');
-    $query->join('field_config', 'fc', 'fci.field_name = fc.field_name');
-    $query->fields('fci', array('field_name'));
-    $query->fields('fc', array('module'));
-    $query->addField('fci', 'bundle', 'node_bundle');
-    $query->condition('fci.entity_type', 'node');
-    $query->condition('fc.module', $field_type, '=');
-
-    foreach ($query->execute() as $record) {
-      $all_field_records[] = $record;
+    // Get text fields in this bundle.
+    $field_instances = field_info_instances('node', $type->type);
+    foreach ($field_instances as $field => $field_instance) {
+      $field_info = field_info_field($field);
+      if (in_array($field_info['type'], array('text', 'text_long', 'text_with_summary', 'paragraphs'))) {
+        $tables_map[] = array(
+          'type' => $type->type,
+          'field' => $field,
+          'field_label' => $field_instance['label'],
+          'table' => 'field_revision_' . $field,
+          'module' => $field_info['module'],
+        );
+      }
     }
   }
 
   // Trigger hook_scanner_fields_alter().
-  drupal_alter('scanner_fields', $all_field_records);
-
-  if (!empty($all_field_records)) {
-    foreach ($all_field_records as $record) {
-      $tables_map[] = array(
-        'type' => $record->node_bundle,
-        'field' => $record->field_name,
-        'field_label' => (empty($record->field_collection_parents) ? '' : implode('->', $record->field_collection_parents) . '->') . $record->field_name,
-        'table' => 'field_revision_' . $record->field_name,
-        'field_collection_parents' => $record->field_collection_parents ?? NULL,
-        'module' => $record->module,
-      );
-    }
-  }
+  backdrop_alter('scanner_fields', $tables_map);
 
   return $tables_map;
 }
@@ -618,14 +618,23 @@ function _scanner_get_all_tables_map() {
  * @return array
  *   Map of selected fields and tables.
  */
+/**
+ * Get the fields that have been selected for scanning.
+ *
+ * @return array
+ *   Map of selected fields and tables.
+ */
 function _scanner_get_selected_tables_map() {
   $tables_map = _scanner_get_all_tables_map();
+  $config = config('scanner.settings');
+
   foreach ($tables_map as $i => $item) {
     $key = 'scanner_' . $item['field'] . '_' . $item['table'] . '_' . $item['type'];
-    if (!variable_get($key, TRUE)) {
+    if (!$config->get($key, TRUE)) {
       unset($tables_map[$i]);
     }
   }
 
   return $tables_map;
 }
+

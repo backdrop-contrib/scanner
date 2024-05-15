@@ -8,15 +8,15 @@
   /**
    * Prevents submit button double-click on replace confirmation form.
    */
-  Drupal.behaviors.hideSubmitButton = {
+  Backdrop.behaviors.hideSubmitButton = {
     attach: function (context) {
-      $('input#edit-confirm').click(function () {
-        $('.scanner-buttons').css('position', 'relative')
-          .append('<div class="scanner-button-msg"><p>Replacing items... please wait...</p></div>')
-        $('.scanner-button-msg').click(function () {
-          return FALSE;
+      $('input#edit-confirm', context).click(function () {
+        $('.scanner-buttons', context).css('position', 'relative')
+          .append('<div class="scanner-button-msg"><p>Replacing items... please wait...</p></div>');
+        $('.scanner-button-msg', context).click(function () {
+          return false;
         });
-        return TRUE;
+        return true;
       });
     }
   };

@@ -14,17 +14,17 @@ function theme_scanner_results($variables) {
   if (is_array($results)) {
     $total = count($results);
 
-    drupal_set_message(filter_xss('Found matches in ' . $total . ' fields. <a href="#results">See below</a> for details.', $allowed_tags = array('a')));
+    backdrop_set_message(filter_xss('Found matches in ' . $total . ' fields. <a href="#results">See below</a> for details.', ['a']));
     $output = '<p>Found matches in ' . $total . ' fields:</p>';
     $output .= '<ol class="scanner-results scanner-search-results">';
     foreach ($results as $item) {
-      $output .= theme('scanner_item', array('item' => $item));
+      $output .= theme('scanner_item', ['item' => $item]);
     }
     $output .= '</ol>';
     // @todo use pager to split up results.
   }
   else {
-    drupal_set_message(t('No matches found. Check the !url for fields that can be searched.', array('!url' => l(t('settings'), 'admin/config/content/scanner'))), 'warning');
+    backdrop_set_message(t('No matches found. Check the !url for fields that can be searched.', ['!url' => l(t('settings'), 'admin/config/content/scanner')]), 'warning');
   }
 
   return $output;
@@ -38,10 +38,10 @@ function theme_scanner_item($variables) {
   $item = $variables['item'];
   $item['count'] = $item['count'] > 0 ? $item['count'] : 'One or more';
   $output .= '<li class="scanner-result">';
-  $title = t('#@nid: @title', array(
+  $title = t('#@nid: @title', [
     '@nid' => $item['nid'],
     '@title' => $item['title'],
-  ));
+  ]);
   $output .= '<span class="scanner-title">' . l($title, 'node/' . $item['nid']) . '</span><br />';
   $output .= '<span class="scanner-info">[' . $item['count'] . ' matches in ' . $item['type'] . ' ' . $item['field_label'] . ' field:]</span><br />';
   $output .= '<span class="scanner-text">' . $item['text'] . '</span>';
@@ -57,17 +57,17 @@ function theme_scanner_replace_results($variables) {
   $results = $variables['results'];
   $output = '';
   if (is_array($results)) {
-    drupal_set_message(filter_xss('Replaced items in ' . count($results) . ' fields. <a href="#results">See below</a> for details.', $allowed_tags = array('a')));
+    backdrop_set_message(filter_xss('Replaced items in ' . count($results) . ' fields. <a href="#results">See below</a> for details.', ['a']));
     $output = '<p>Replaced items in ' . count($results) . ' fields:</p>';
     $output .= '<ol class="scanner-results scanner-replace-results">';
     foreach ($results as $item) {
-      $output .= theme('scanner_replace_item', array('item' => $item));
+      $output .= theme('scanner_replace_item', ['item' => $item]);
     }
     $output .= '</ol>';
     // @todo use pager to split up results.
   }
   else {
-    drupal_set_message(t('No matches found. Check the !url for fields that can be searched.', array('!url' => l(t('settings'), 'admin/config/content/scanner'))), 'warning');
+    backdrop_set_message(t('No matches found. Check the !url for fields that can be searched.', ['!url' => l(t('settings'), 'admin/config/content/scanner')]), 'warning');
   }
 
   return $output;

@@ -36,7 +36,7 @@ function scanner_menu() {
   $items['admin/content/scanner/scan/confirm'] = array(
     'title' => 'Confirm Replace',
     'access arguments' => array('perform search and replace'),
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('scanner_confirm_form'),
     'type' => MENU_CALLBACK,
     'file' => 'scanner.pages.inc',
@@ -51,7 +51,7 @@ function scanner_menu() {
   $items['admin/content/scanner/undo/confirm'] = array(
     'title' => 'Confirm Undo',
     'access arguments' => array('perform search and replace'),
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('scanner_undo_confirm_form'),
     'type' => MENU_CALLBACK,
     'file' => 'scanner.pages.inc',
@@ -59,7 +59,7 @@ function scanner_menu() {
   $items['admin/config/content/scanner'] = array(
     'title' => 'Search and Replace Scanner',
     'description' => 'Configure defaults and what fields can be searched and replaced.',
-    'page callback' => 'drupal_get_form',
+    'page callback' => 'backdrop_get_form',
     'page arguments' => array('scanner_admin_form'),
     'access arguments' => array('administer scanner settings'),
     'file' => 'scanner.admin.inc',
@@ -174,38 +174,38 @@ function scanner_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr,
  */
 function field_collection_scanner_fields_alter(array &$all_field_records, $node_bundle = NULL, $parent_bundle = NULL, $parents = NULL) {
   // On behalf of field_collection.module.
-  $query = db_select('field_config_instance', 'instance_parent');
-  $query->join('field_config', 'config_parent', 'instance_parent.field_name = config_parent.field_name');
-  $query->join('field_config_instance', 'instance_child', 'instance_child.bundle = config_parent.field_name');
-  $query->join('field_config', 'config_child', 'instance_child.field_name = config_child.field_name');
-  $query->fields('config_child', array('field_name', 'module'));
-  $query->fields('instance_parent', array('bundle'));
-  $query->addField('config_parent', 'field_name', 'field_collection_name');
-  if ($parent_bundle) {
-    $query->condition('config_parent.field_name', $parent_bundle);
-    $query->condition('instance_parent.entity_type', 'field_collection_item');
-  }
-  else {
-    $query->condition('instance_parent.entity_type', 'node');
-  }
-  $query->condition('instance_child.entity_type', 'field_collection_item');
-  $query->condition('config_child.module', array('text', 'field_collection'), 'IN');
 
-  $result = $query->execute();
+  // Load all field instances from configuration.
+  $field_configs = config_get_names_with_prefix('field.field.node.');
 
-  foreach ($result as $record) {
-    $field_parents = $parents ?? array($record->field_collection_name);
-    $record->node_bundle = $node_bundle ?? $record->bundle;
-    if ($record->module == 'text') {
-      $record->field_collection_parents = $field_parents;
-      $all_field_records[] = $record;
-    }
-    elseif ($record->module == 'field_collection') {
-      // This if statement prevents infinite recursion if a field collection is
-      // nested within itself.
-      if (!in_array($record->field_name, $field_parents)) {
-        $field_parents[] = $record->field_name;
-        field_collection_scanner_fields_alter($all_field_records, $record->node_bundle, $record->field_name, $field_parents);
+  foreach ($field_configs as $field_config_name) {
+    $field_config = config($field_config_name);
+    $field_name = $field_config->get('field_name');
+    $field_type = $field_config->get('type');
+    $bundle = $field_config->get('bundle');
+    $module = $field_config->get('module');
+
+    // Check if the field is a field collection or text field.
+    if ($field_type == 'field_collection' || $module == 'text') {
+      $record = (object) [
+        'field_name' => $field_name,
+        'module' => $module,
+        'node_bundle' => $bundle,
+        'field_collection_name' => $parent_bundle,
+      ];
+
+      $field_parents = isset($parents) ? $parents : [$record->field_collection_name];
+      $record->node_bundle = isset($node_bundle) ? $node_bundle : $record->node_bundle;
+
+      if ($record->module == 'text') {
+        $record->field_collection_parents = $field_parents;
+        $all_field_records[] = $record;
+      } elseif ($record->module == 'field_collection') {
+        // This if statement prevents infinite recursion if a field collection is nested within itself.
+        if (!in_array($record->field_name, $field_parents)) {
+          $field_parents[] = $record->field_name;
+          field_collection_scanner_fields_alter($all_field_records, $record->node_bundle, $record->field_name, $field_parents);
+        }
       }
     }
   }

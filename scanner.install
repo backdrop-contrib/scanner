@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Search and Replace Scanner install scripts, etc.
+ * Install, update, and uninstall functions for the Search and Replace Scanner module.
  */
 
 /**
@@ -47,7 +47,7 @@ function scanner_schema() {
         'not null' => TRUE,
       ),
       'time' => array(
-        'description' => 'How long the replacement took',
+        'description' => 'Timestamp when the replacement was performed',
         'type' => 'int',
         'not null' => TRUE,
       ),
@@ -59,8 +59,43 @@ function scanner_schema() {
 }
 
 /**
- * Rebuild the menu cache.
+ * Implements hook_install().
  */
-function scanner_update_7100() {
-  variable_set('menu_rebuild_needed', TRUE);
+function scanner_install() {
+  // Import default configuration.
+  config_install_default_config('module', 'scanner');
+}
+
+/**
+ * Implements hook_update_N().
+ */
+function scanner_update_1000() {
+  // Migrate variables to config.
+  $config = config('scanner.settings');
+  $config->set('scanner_mode', update_variable_get('scanner_mode', FALSE));
+  $config->set('scanner_wholeword', update_variable_get('scanner_wholeword', FALSE));
+  $config->set('scanner_regex', update_variable_get('scanner_regex', FALSE));
+  $config->set('scanner_published', update_variable_get('scanner_published', TRUE));
+  $config->set('scanner_pathauto', update_variable_get('scanner_pathauto', TRUE));
+  $config->set('scanner_vocabulary', update_variable_get('scanner_vocabulary', array()));
+  $config->save();
+
+  // Delete variables.
+  update_variable_del('scanner_mode');
+  update_variable_del('scanner_wholeword');
+  update_variable_del('scanner_regex');
+  update_variable_del('scanner_published');
+  update_variable_del('scanner_pathauto');
+  update_variable_del('scanner_vocabulary');
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function scanner_uninstall() {
+  // Drop the table when the module is uninstalled.
+  db_drop_table('scanner');
+
+  // Remove any variables or configuration settings.
+  config_clear('scanner.settings');
 }
