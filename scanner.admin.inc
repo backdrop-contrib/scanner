@@ -69,7 +69,7 @@ function scanner_admin_form($form, &$form_state) {
   $form['fields'] = array(
     '#type' => 'fieldset',
     '#title' => t('Fields that will be searched'),
-    '#description' => t('Fields are listed in [nodetype: fieldname] order:'),
+    '#description' => t('Fields are listed in [entity: fieldname] order:'),
   );
 
   $field_configs = _scanner_get_all_tables_map();

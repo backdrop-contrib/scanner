@@ -112,8 +112,8 @@ function _scanner_execute($searchtype = 'search') {
 
   // Get process and undo data if saved from timeout.
   $config = config('scanner.settings');
-  $processed = $config->get('scanner_partially_processed_' . $user->uid, []);
-  $undo_data = $config->get('scanner_partial_undo_' . $user->uid, []);
+  $processed = $_SESSION['scanner_partially_processed'] ?? [];
+  $undo_data = $_SESSION['scanner_partial_undo'] ?? [];
 
   // Get the field collection field to use when joining revisions.
   $fc_revision_field = db_table_exists('field_collection_item_revision') ? 'revision_id' : 'value';
@@ -132,6 +132,10 @@ function _scanner_execute($searchtype = 'search') {
   $pathauto = $_SESSION['scanner_pathauto'];
   $terms = $_SESSION['scanner_terms'] ?? NULL;
   $results = NULL;
+
+  dpm($_SESSION, 'Session Data');
+  dpm($flag);
+
 
   if ($searchtype == 'search') {
     backdrop_set_message(t('Searching for: [%search] ...', ['%search' => $search]));
@@ -195,6 +199,7 @@ function _scanner_execute($searchtype = 'search') {
   }
 
   $table_map = _scanner_get_selected_tables_map();
+  //dpm($table_map);
   usort($table_map, '_scanner_compare_fields_by_name');
 
   // Examine each field instance as chosen in settings.
@@ -245,8 +250,10 @@ function _scanner_execute($searchtype = 'search') {
       }
     }
     else {
-      // Must use vid and revision_id here. Make sure it saves as new revision.
-      $query->join('node', 'n', 't.' . $vid . ' = n.vid');
+      // Only add the node join if the field is not paragraph-specific.
+      if (strpos($type, 'paragraph:') === FALSE) {
+        $query->join('node', 'n', 't.' . $vid . ' = n.vid');
+      }
     }
     if (is_array($terms) && !empty($terms)) {
       $terms_or = db_or();
@@ -256,38 +263,108 @@ function _scanner_execute($searchtype = 'search') {
       }
       $query->condition($terms_or);
     }
-    $query->addField('t', $field, 'content');
+    // Add correct suffix for paragraph fields.
+    if (strpos($map['type'], 'paragraph:') !== FALSE) {
+      $query->distinct();
 
-    if ($table != 'node_revision') {
+      // Ensure '_value' is only added if not already present.
+      if (!str_ends_with($field, '_value')) {
+        $field .= '_value';
+      }
+
+      // Add fields to SELECT for paragraphs.
+      $query->addField('t', $field, 'content');
+      $query->addField('t', 'bundle', 'bundle');
       $query->fields('t', ['delta']);
-    }
-    $query->fields('n', ['nid', 'title']);
+      $query->addField('pi', 'item_id', 'entity_id'); // Add entity_id for paragraph replacement.
 
-    $query->condition('n.type', $type, '=');
+      // Join with paragraphs_item table.
+      $query->join('paragraphs_item', 'pi', 'pi.item_id = t.entity_id AND pi.revision_id = t.revision_id');
 
-    // Build the master 'where' arguments.
-    $or = db_or();
-    $binary = $mode ? ' BINARY' : '';
-    // Trigger hook_scanner_query_where().
-    foreach (module_implements('scanner_query_where') as $module_name) {
-      $function = $module_name . '_scanner_query_where';
-      $function($or, $table, $field, $where, $binary);
-    }
-    $query->condition($or);
+      // Dynamically determine the field_name for the paragraphs reference.
+      $field_name = db_query("
+        SELECT DISTINCT field_name
+        FROM {paragraphs_item}
+        WHERE bundle = :bundle
+        LIMIT 1
+    ", [':bundle' => str_replace('paragraph:', '', $map['type'])])->fetchField();
 
-    if ($published) {
-      $query->condition('n.status', '1', '=');
+      if (!$field_name) {
+        throw new Exception('Could not determine the field name for paragraphs.');
+      }
+
+      // Construct the paragraphs field table dynamically.
+      $paragraphs_field_table = 'field_data_' . $field_name;
+
+      // Join with the dynamically determined paragraphs field table.
+      $query->join($paragraphs_field_table, 'fp', "fp.{$field_name}_value = pi.item_id");
+
+      // Join with the node table to get node information.
+      $query->join('node', 'n', 'n.nid = fp.entity_id');
+
+      // Add node-specific fields.
+      $query->addField('n', 'nid', 'nid');
+      $query->addField('n', 'title', 'title');
+
+      // Filter by paragraph bundle.
+      $query->condition('t.bundle', str_replace('paragraph:', '', $type), '=');
+    } else {
+      // Regular node-based fields.
+      $query->addField('t', $field, 'content');
+
+      if ($table != 'node_revision') {
+        $query->fields('t', ['delta']);
+      }
+
+      // Add node-specific fields.
+      $query->fields('n', ['nid', 'title']);
+      $query->condition('n.type', $type, '=');
+
+      // Filter by node type.
+      $query->condition('n.type', $type, '=');
+
+      // Retrieve the search term from the session.
+      $search_term = $_SESSION['scanner_search'] ?? '';
+      if (empty($search_term)) {
+        throw new Exception('Search term is required but not provided.');
+      }
+      //dpm($search_term, 'Search Term');
+
+      // Properly construct the CONVERT statement with enforced spacing.
+      $charset_conversion = "CONVERT(t.$field USING utf8mb4)";
+      //dpm($charset_conversion, 'Charset Conversion');
+
+      // Build the base where condition.
+      $query->where("(CONVERT(t.$field USING utf8mb4) REGEXP :search_term)", [':search_term' => $search_term]);
+
+      // Check if a summary field exists and add its condition directly.
+      if (!empty($summary_field)) {
+        $query->where("(CONVERT(t.$summary_field USING utf8mb4) REGEXP :search_term)", [':search_term' => $search_term]);
+      }
+
+      // Add debugging to ensure conditions are constructed correctly.
+      //dpm((string) $query, 'Query After Adding Conditions');
+
+
+      if ($published) {
+        $query->condition('n.status', '1', '=');
+      }
     }
+
 
     // Triggers hook_scanner_query_alter().
     // Allow the query to be modified.
     backdrop_alter('scanner_query', $query, $map, $table, $field);
+    // Debug the constructed SQL query.
+    //dpm($field_name, 'Dynamic Paragraph Field Name');
 
+    //dpm((string) $query, 'Constructed SQL Query');
     $result = $query->execute();
     $shutting_down = FALSE;
 
     // Perform the search or replace on each hit for the current field instance.
     foreach ($result as $row) {
+      //dpm($row);
       // Results of an entity property, e.g. the node title, won't have a
       // 'delta' attribute, so make sure there is one.
       if (!isset($row->delta)) {
@@ -333,8 +410,12 @@ function _scanner_execute($searchtype = 'search') {
 
       $node = node_load($row->nid);
 
+      //dpm($content, 'Search Target');
+      //dpm($flag, 'Regex Flag');
+
       // Build the regular expression used later.
       $regexstr = "/$search_php/$flag";
+      //dpm($regexstr);
 
       // Search.
       if ($searchtype == 'search') {
@@ -356,15 +437,18 @@ function _scanner_execute($searchtype = 'search') {
           foreach ($matches as $key => $item) {
             $string = $key == 0 ? $content : $summary;
             foreach ($item as $match) {
+              //dpm($match, "Individual Match");
               $text .= '<li>';
               // If ($key == 1) {
               // $text .= '<i>Summary:</i> ';
               // }.
               // Don't want substr to wrap.
-              $start = $match[1] - $context_length > 0 ? $match[1] - $context_length : 0;
+              $start = $match[1] - $context_length > 0 ? $match[1]
+                - $context_length : 0;
               // If the match is close to the beginning of the string, need
               // less context.
-              $length = $match[1] >= $context_length ? $context_length : $match[1];
+              $length = $match[1] >= $context_length ? $context_length
+                : $match[1];
 
               if ($prepend = substr($string, $start, $length)) {
                 if ($length == $context_length) {
@@ -373,11 +457,19 @@ function _scanner_execute($searchtype = 'search') {
                 $text .= htmlentities($prepend, ENT_COMPAT, 'UTF-8');
               }
 
-              $text .= '<strong>' . htmlentities($match[0], ENT_COMPAT, 'UTF-8') . '</strong>';
+              $text .= '<strong>' . htmlentities($match[0], ENT_COMPAT, 'UTF-8')
+                . '</strong>';
 
-              if ($append = substr($string, $match[1] + strlen($match[0]), $context_length)) {
+              if ($append = substr(
+                $string,
+                $match[1] + strlen($match[0]),
+                $context_length
+              )
+              ) {
                 $text .= htmlentities($append, ENT_COMPAT, 'UTF-8');
-                if (strlen($string) - ($match[1] + strlen($match[0])) > $context_length) {
+                if (strlen($string) - ($match[1] + strlen($match[0]))
+                  > $context_length
+                ) {
                   $text .= '...';
                 }
               }
@@ -387,23 +479,34 @@ function _scanner_execute($searchtype = 'search') {
           $text .= '</ul>';
         }
         else {
-          $text = '<div class="messages warning"><h2 class="element-invisible">Warning message</h2>'
-            . t("Can't display search result due to conflict between search term and internal preg_match_all function.")
+          $text
+            = '<div class="messages warning"><h2 class="element-invisible">Warning message</h2>'
+            . t(
+              "Can't display search result due to conflict between search term and internal preg_match_all function."
+            )
             . '</div>';
         }
 
-        $results[] = [
-          'title' => $row->title,
-          'type' => $type,
-          'count' => $hits,
-          'field' => $field,
-          'field_label' => $field_label,
-          'nid' => $row->nid,
-          'text' => $text,
-        ];
+        if ($hits > 0) {
+          $results[] = [
+            'title' => $row->title,
+            'type' => $type,
+            'count' => $hits,
+            'field' => $field,
+            'field_label' => $field_label,
+            'nid' => $row->nid,
+            'text' => $text,
+          ];
+          //dpm($results, 'Results Updated');
+        }
+        else {
+          //dpm('No matches for this field, skipping.', 'Skip Adding to
+          // Results');
+        }
       }
 
-      // Replace (and check to see if already processed).
+
+        // Replace (and check to see if already processed).
       elseif (!isset($processed[$field][$row->nid][$row->delta])) {
         // Check first if pathauto_persist, a newer version of pathauto, or some
         // other module has already set $node->path['pathauto']. If not, set it
@@ -423,6 +526,67 @@ function _scanner_execute($searchtype = 'search') {
 
         $hits = 0;
         preg_match('/(.+)_' . $suffix . '$/', $field, $matches);
+
+        // Paragraphs.
+        if (strpos($type, 'paragraph:') !== FALSE) {
+          // Load the paragraph entity.
+          $paragraph = paragraphs_item_load($row->entity_id);
+          if (!$paragraph) {
+            backdrop_set_message(t('Failed to load paragraph with ID %id', ['%id' => $row->entity_id]), 'error');
+            continue;
+          }
+
+          // Extract the base field name from the full field name (e.g., "field_text_in_the_paragraph").
+          preg_match('/(.+)_value$/', $field, $matches);
+          $base_field_name = $matches[1] ?? $field;
+
+          // Validate the existence of the base field in the paragraph entity.
+          if (!isset($paragraph->{$base_field_name})) {
+            backdrop_set_message(t('Field %field does not exist on paragraph %id', [
+              '%field' => $base_field_name,
+              '%id' => $row->entity_id,
+            ]), 'warning');
+            continue;
+          }
+
+          // Prepare replacement.
+          $hits = 0;
+          $field_data = &$paragraph->{$base_field_name};
+
+          foreach ($field_data as $langcode => &$values) {
+            foreach ($values as &$value) {
+              if (isset($value['value'])) {
+                $value['value'] = preg_replace($regexstr, $replace, $value['value'], -1, $hit_count);
+                $hits += $hit_count;
+              }
+
+              if (isset($value['summary'])) {
+                $value['summary'] = preg_replace($regexstr, $replace, $value['summary'], -1, $hit_count);
+                $hits += $hit_count;
+              }
+            }
+          }
+
+          // Update the paragraph's host entity dynamically and save the paragraph.
+          $host_node = $paragraph->hostEntity();
+          if ($host_node) {
+            $paragraph->setHostEntity('node', $host_node);
+          }
+
+          $paragraph->save();
+
+          // Add results for logging.
+          $results[] = [
+            'title' => $host_node->title ?? 'Unknown Host',
+            'nid' => $host_node->nid ?? 'N/A',
+            'type' => $type,
+            'count' => $hits,
+            'field' => $field,
+            'field_label' => $field_label,
+          ];
+
+          continue;
+        }
 
         // Field collections.
         if (!empty($field_collection_parents)) {
@@ -484,6 +648,14 @@ function _scanner_execute($searchtype = 'search') {
 
         // Normal node fields.
         else {
+          // Skip processing if this is a paragraph field.
+          if (strpos($type, 'paragraph:') !== FALSE) {
+            continue;
+          }
+
+          // Normal node fields.
+          $hits = 0;
+
           // Trigger hook_scanner_preg_replace().
           foreach (module_implements('scanner_preg_replace') as $module_name) {
             $function = $module_name . '_scanner_preg_replace';
@@ -536,7 +708,11 @@ function _scanner_execute($searchtype = 'search') {
     return theme('scanner_results', ['results' => $results]);
   }
   // Searchtype == 'replace'.
+  // Searchtype == 'replace'.
   else {
+    // Ensure $undo_data is initialized as an array if it is null or undefined.
+    $undo_data = $undo_data ?? [];
+
     if (count($undo_data) && !$shutting_down) {
       db_insert('scanner')
         ->fields([
@@ -552,6 +728,7 @@ function _scanner_execute($searchtype = 'search') {
 
     return theme('scanner_replace_results', ['results' => $results]);
   }
+
 }
 
 /**
@@ -577,31 +754,45 @@ function _scanner_execute($searchtype = 'search') {
  *   used for displaying/querying.
  */
 function _scanner_get_all_tables_map() {
-  $tables_map = array();
+  $tables_map = [];
 
-  // Build list of title fields for all node types.
-  foreach (node_type_get_types() as $type) {
-    if ($type->has_title) {
-      $tables_map[] = array(
-        'type' => $type->type,
-        'field' => 'title',
-        'field_label' => 'title',
-        'table' => 'node_revision',
-      );
-    }
+  // Add node fields, including the title.
+  foreach (node_type_get_types() as $node_type) {
+    // Add the title field explicitly.
+    $tables_map[] = [
+      'type' => $node_type->type,
+      'field' => 'title',
+      'field_label' => t('Title'),
+      'table' => 'node_revision',
+    ];
 
-    // Get text fields in this bundle.
-    $field_instances = field_info_instances('node', $type->type);
-    foreach ($field_instances as $field => $field_instance) {
-      $field_info = field_info_field($field);
-      if (in_array($field_info['type'], array('text', 'text_long', 'text_with_summary', 'paragraphs'))) {
-        $tables_map[] = array(
-          'type' => $type->type,
-          'field' => $field,
+    $field_instances = field_info_instances('node', $node_type->type);
+    foreach ($field_instances as $field_name => $field_instance) {
+      $field_info = field_info_field($field_name);
+      if (in_array($field_info['type'], ['text', 'text_long', 'text_with_summary'])) {
+        $tables_map[] = [
+          'type' => $node_type->type,
+          'field' => $field_name,
           'field_label' => $field_instance['label'],
-          'table' => 'field_revision_' . $field,
-          'module' => $field_info['module'],
-        );
+          'table' => 'field_revision_' . $field_name,
+        ];
+      }
+    }
+  }
+
+  // Add paragraph fields.
+  $paragraph_bundles = field_info_bundles('paragraphs_item');
+  foreach ($paragraph_bundles as $bundle_name => $bundle_info) {
+    $field_instances = field_info_instances('paragraphs_item', $bundle_name);
+    foreach ($field_instances as $field_name => $instance) {
+      $field_info = field_info_field($field_name);
+      if (in_array($field_info['type'], ['text', 'text_long', 'text_with_summary'])) {
+        $tables_map[] = [
+          'type' => 'paragraph:' . $bundle_name,
+          'field' => $field_name,
+          'field_label' => $instance['label'],
+          'table' => 'field_revision_' . $field_name,
+        ];
       }
     }
   }
@@ -609,6 +800,7 @@ function _scanner_get_all_tables_map() {
   // Trigger hook_scanner_fields_alter().
   backdrop_alter('scanner_fields', $tables_map);
 
+  //dpm($tables_map);
   return $tables_map;
 }
 
@@ -626,7 +818,25 @@ function _scanner_get_all_tables_map() {
  */
 function _scanner_get_selected_tables_map() {
   $tables_map = _scanner_get_all_tables_map();
+  //dpm($tables_map);
   $config = config('scanner.settings');
+
+  /*foreach ($tables_map as $i => $item) {
+    // Handle node fields.
+    if (strpos($item['type'], 'paragraph:') === 0) {
+      // Handle paragraph fields separately.
+      $bundle_name = str_replace('paragraph:', '', $item['type']);
+      $key = 'scanner_paragraphs_' . $item['field'] . '_' . $item['table'] . '_' . $bundle_name;
+    } else {
+      // Handle node fields.
+      $key = 'scanner_nodes_' . $item['field'] . '_' . $item['table'] . '_' . $item['type'];
+    }
+
+    // Check if the field is enabled in the configuration.
+    if (!$config->get($key, TRUE)) {
+      unset($tables_map[$i]);
+    }
+  }*/
 
   foreach ($tables_map as $i => $item) {
     $key = 'scanner_' . $item['field'] . '_' . $item['table'] . '_' . $item['type'];
@@ -635,6 +845,7 @@ function _scanner_get_selected_tables_map() {
     }
   }
 
-  return $tables_map;
+  //dpm($tables_map);
+  // Reindex array to maintain order and avoid gaps.
+  return array_values($tables_map);
 }
-
