@@ -17,6 +17,18 @@ define('SCANNER_STATUS_GO_CONFIRM', 2);
 define('SCANNER_STATUS_GO_REPLACE', 3);
 
 /**
+ * Implements hook_config_info().
+ */
+function scanner_config_info() {
+  return [
+    'scanner.settings' => [
+      'label' => t('Search and Replace Scanner Settings'),
+      'group' => t('Configuration'),
+    ],
+  ];
+}
+
+/**
  * Implements hook_menu().
  */
 function scanner_menu() {
@@ -165,7 +177,6 @@ function scanner_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr,
   else {
     $node->{$field} = $new_value;
   }
-
   return $hits;
 }
 

@@ -36,15 +36,31 @@ function theme_scanner_results($variables) {
 function theme_scanner_item($variables) {
   $output = '';
   $item = $variables['item'];
-  $item['count'] = $item['count'] > 0 ? $item['count'] : 'One or more';
+  $item['count'] = $item['count']; // No need to handle 0 cases anymore.
+
+
   $output .= '<li class="scanner-result">';
-  $title = t('#@nid: @title', [
-    '@nid' => $item['nid'],
-    '@title' => $item['title'],
-  ]);
-  $output .= '<span class="scanner-title">' . l($title, 'node/' . $item['nid']) . '</span><br />';
-  $output .= '<span class="scanner-info">[' . $item['count'] . ' matches in ' . $item['type'] . ' ' . $item['field_label'] . ' field:]</span><br />';
-  $output .= '<span class="scanner-text">' . $item['text'] . '</span>';
+
+  // Check if this is a paragraph result.
+  if (strpos($item['type'], 'paragraph:') === 0) {
+    // Paragraph-specific result.
+    $bundle = str_replace('paragraph:', '', $item['type']);
+    $output .= '<strong>Paragraph - ' . str_replace('_', ' ', $bundle) . '</strong><br />';
+    $output .= '<strong>Field:</strong> ' . $item['field_label'] . '<br />';
+    // Use `nid` for view and edit links.
+    $output .= check_plain($item['title']) . ' | ' . l(t('view'), 'node/' . $item['nid']) . ' | ' . l(t('edit'), 'node/' . $item['nid'] . '/edit') . '<br />';
+    $output .= '[1 match in the field]<br />';
+    $output .= $item['text'];
+  } else {
+    // Node-specific result.
+    $output .= '<strong>Node - ' . check_plain($item['type']) . '</strong><br />';
+    $output .= '<strong>Field:</strong> ' . $item['field_label'] . '<br />';
+    // Use `nid` for view and edit links.
+    $output .= check_plain($item['title']) . ' | ' . l(t('view'), 'node/' . $item['nid']) . ' | ' . l(t('edit'), 'node/' . $item['nid'] . '/edit') . '<br />';
+    $output .= '[1 match in the field]<br />';
+    $output .= $item['text'];
+  }
+
   $output .= '</li>';
 
   return $output;

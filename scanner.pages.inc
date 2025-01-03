@@ -420,76 +420,58 @@ function scanner_undo_confirm_form($form, &$form_state) {
 /**
  * Form submission handler for the confirm button.
  */
-/**
- * Form submission handler for the confirm button.
- */
 function scanner_undo_confirm_form_submit($form, &$form_state) {
-  // Debug: Print form_state values
-  // dpm($form_state['values'], 'form_state values');
-
   if ($form_state['values']['op'] == t('Yes, Continue')) {
-    $query = db_select('scanner', 's');
-    $query->fields('s', array('undo_data', 'undone'))
-      ->condition('undo_id', $form_state['values']['undo_id'], '=');
+    // Fetch the undo data.
+    $undo = db_select('scanner', 's')
+      ->fields('s', ['undo_data', 'undone'])
+      ->condition('undo_id', $form_state['values']['undo_id'], '=')
+      ->execute()
+      ->fetchObject();
 
-    $results = $query->execute();
-    // Debug: Print query results
-    // dpm($results, 'query results');
-
-    $undo = $results->fetchObject();
-    // Debug: Print undo data
-    // dpm($undo, 'undo');
-
-    if ($undo) {
-      $undos = unserialize($undo->undo_data);
-      $count = 0;
-
-      foreach ($undos as $nid => $sandr_event) {
-        // Debug: Print each undo event
-      //  dpm($sandr_event, 'sandr_event');
-
-        if ($undo->undone == 0) {
-          $vid = $sandr_event['old_vid'];
-          $undone = 1;
-        } else {
-          $vid = $sandr_event['new_vid'];
-          $undone = 0;
-        }
-
-        $node = node_load($nid, $vid);
-        // Debug: Print node
-        // dpm($node, 'node');
-
-        if ($node) {
-          $node->revision = TRUE;
-          $node->log = t('Copy of the revision from %date via Search and Replace Undo', array('%date' => format_date($node->revision_timestamp)));
-          node_save($node);
-          $count++;
-        }
-      }
-
-      backdrop_set_message($count . ' ' . t('Nodes reverted'));
-      db_update('scanner')
-        ->fields(array(
-          'undone' => $undone,
-        ))
-        ->condition('undo_id', $form_state['values']['undo_id'])
-        ->execute();
-    } else {
-      backdrop_set_message(t('No undo data found for the given undo ID.'), 'error');
+    if (!$undo) {
+      backdrop_set_message(t('No undo data found for the specified ID.'), 'error');
+      return;
     }
-  } else {
+
+    $undos = unserialize($undo->undo_data);
+    $count = 0;
+    $new_undone_value = ($undo->undone == 0) ? 1 : 0;
+
+    foreach ($undos as $nid => $sandr_event) {
+      $vid = ($undo->undone == 0) ? $sandr_event['old_vid'] : $sandr_event['new_vid'];
+      $node = node_load($nid, $vid);
+
+      if ($node) {
+        $node->is_active_revision = 1;
+        $revision_timestamp = !empty($node->revision_timestamp) && is_numeric($node->revision_timestamp) && $node->revision_timestamp > 0
+          ? $node->revision_timestamp
+          : REQUEST_TIME;
+
+        $node->log = t('Copy of the revision from %date via Search and Replace Undo', [
+          '%date' => format_date($revision_timestamp),
+        ]);
+
+        node_save($node);
+        $count++;
+      }
+    }
+
+    // Update the `undone` status in the database.
+    db_update('scanner')
+      ->fields(['undone' => $new_undone_value])
+      ->condition('undo_id', $form_state['values']['undo_id'])
+      ->execute();
+
+    backdrop_set_message(t('@count nodes reverted.', ['@count' => $count]));
+  }
+  else {
     backdrop_set_message(t('Undo / Redo canceled'));
   }
 
-  // Debug: Print node ID
-  if (isset($node)) {
-  // dpm($node->nid, 'node nid');
-  }
-
+  // Redirect back to the undo administration page.
   $form_state['redirect'] = 'admin/content/scanner/undo';
 }
-
 
 /**
  * Form submission handler for the cancel button.

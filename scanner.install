@@ -96,6 +96,12 @@ function scanner_uninstall() {
   // Drop the table when the module is uninstalled.
   db_drop_table('scanner');
 
-  // Remove any variables or configuration settings.
-  config_clear('scanner.settings');
+  // Remove individual configuration settings.
+  config_clear('scanner.settings', 'scanner_mode');
+  config_clear('scanner.settings', 'scanner_wholeword');
+  config_clear('scanner.settings', 'scanner_regex');
+  config_clear('scanner.settings', 'scanner_published');
+  config_clear('scanner.settings', 'scanner_pathauto');
+  config_clear('scanner.settings', 'scanner_vocabulary');
 }
+
