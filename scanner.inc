@@ -23,7 +23,8 @@
  * @return bool
  *   Indicates whether the setting is changed.
  */
-function _scanner_change_env($setting, $value, $verbose = FALSE) {
+function _scanner_change_env($setting, $value, $verbose = FALSE)
+{
   $old_value = ini_get($setting);
 
   if ($old_value != $value && $old_value != 0) {
@@ -36,8 +37,7 @@ function _scanner_change_env($setting, $value, $verbose = FALSE) {
         )));
       }
       return TRUE;
-    }
-    else {
+    } else {
       if ($verbose) {
         backdrop_set_message(t('%setting could not be changed from %old_value to %value.', array(
           '%setting' => $setting,
@@ -63,7 +63,8 @@ function _scanner_change_env($setting, $value, $verbose = FALSE) {
  *   Comparison value determining which order these two fields should be sorted
  *   in relation to each other based on field label.
  */
-function _scanner_compare_fields_by_label(array $left, array $right) {
+function _scanner_compare_fields_by_label(array $left, array $right)
+{
   $cmp = strcmp($left['type'], $right['type']);
   if ($cmp != 0) {
     return $cmp;
@@ -84,7 +85,8 @@ function _scanner_compare_fields_by_label(array $left, array $right) {
  *   Comparison value determining which order these two fields should be sorted
  *   in relation to each other based on field name.
  */
-function _scanner_compare_fields_by_name(array $left, array $right) {
+function _scanner_compare_fields_by_name(array $left, array $right)
+{
   $cmp = strcmp($left['type'], $right['type']);
   if ($cmp != 0) {
     return $cmp;
@@ -102,7 +104,8 @@ function _scanner_compare_fields_by_name(array $left, array $right) {
  * @return string
  *   The themed results.
  */
-function _scanner_execute($searchtype = 'search') {
+function _scanner_execute($searchtype = 'search')
+{
   global $user;
 
   // Variables to monitor possible timeout.
@@ -133,8 +136,8 @@ function _scanner_execute($searchtype = 'search') {
   $terms = $_SESSION['scanner_terms'] ?? NULL;
   $results = NULL;
 
-  dpm($_SESSION, 'Session Data');
-  dpm($flag);
+  //dpm($_SESSION, 'Session Data');
+  //dpm($flag);
 
 
   if ($searchtype == 'search') {
@@ -219,8 +222,7 @@ function _scanner_execute($searchtype = 'search') {
     $query = db_select($table, 't');
     if ($table == 'node_revision') {
       $vid = 'vid';
-    }
-    else {
+    } else {
       $field = $field . '_' . $suffix;
       $field_label = $field_label . '_' . $suffix;
       $vid = 'revision_id';
@@ -235,21 +237,28 @@ function _scanner_execute($searchtype = 'search') {
         $fc_alias = 'fc' . ($i - 1);
         $fc_table = 'field_revision_' . $fc_this;
         $prev_alias = ($i == $cnt_fc) ? 't' : ('fc' . $i);
-        $query->join($fc_table, $fc_alias,
-          format_string('!PREV_ALIAS.entity_id = !FC_ALIAS.!FC_THIS_value AND !PREV_ALIAS.revision_id = !FC_ALIAS.!FC_THIS_!FC_REV',
+        $query->join(
+          $fc_table,
+          $fc_alias,
+          format_string(
+            '!PREV_ALIAS.entity_id = !FC_ALIAS.!FC_THIS_value AND !PREV_ALIAS.revision_id = !FC_ALIAS.!FC_THIS_!FC_REV',
             [
               '!FC_ALIAS' => $fc_alias,
               '!FC_THIS' => $fc_this,
               '!PREV_ALIAS' => $prev_alias,
               '!FC_REV' => $fc_revision_field,
-            ]));
+            ]
+          )
+        );
         if ($i == 1) {
-          $query->join('node', 'n',
-            format_string('!FC_ALIAS.entity_id = n.nid AND !FC_ALIAS.revision_id = n.vid', ['!FC_ALIAS' => $fc_alias]));
+          $query->join(
+            'node',
+            'n',
+            format_string('!FC_ALIAS.entity_id = n.nid AND !FC_ALIAS.revision_id = n.vid', ['!FC_ALIAS' => $fc_alias])
+          );
         }
       }
-    }
-    else {
+    } else {
       // Only add the node join if the field is not paragraph-specific.
       if (strpos($type, 'paragraph:') === FALSE) {
         $query->join('node', 'n', 't.' . $vid . ' = n.vid');
@@ -382,8 +391,7 @@ function _scanner_execute($searchtype = 'search') {
         if (!$expanded) {
           if ($user->uid > 0) {
             $verbose = TRUE;
-          }
-          else {
+          } else {
             $verbose = FALSE;
           }
           if (_scanner_change_env('max_execution_time', '600', $verbose)) {
@@ -400,8 +408,7 @@ function _scanner_execute($searchtype = 'search') {
           $config->save();
           if ($searchtype == 'search') {
             backdrop_set_message(t('Did not have enough time to complete search.'), 'error');
-          }
-          else {
+          } else {
             backdrop_set_message(t('Did not have enough time to complete. Please re-submit replace'), 'error');
           }
           break 2;
@@ -464,10 +471,10 @@ function _scanner_execute($searchtype = 'search') {
                 $string,
                 $match[1] + strlen($match[0]),
                 $context_length
-              )
-              ) {
+              )) {
                 $text .= htmlentities($append, ENT_COMPAT, 'UTF-8');
-                if (strlen($string) - ($match[1] + strlen($match[0]))
+                if (
+                  strlen($string) - ($match[1] + strlen($match[0]))
                   > $context_length
                 ) {
                   $text .= '...';
@@ -477,8 +484,7 @@ function _scanner_execute($searchtype = 'search') {
             }
           }
           $text .= '</ul>';
-        }
-        else {
+        } else {
           $text
             = '<div class="messages warning"><h2 class="element-invisible">Warning message</h2>'
             . t(
@@ -498,15 +504,14 @@ function _scanner_execute($searchtype = 'search') {
             'text' => $text,
           ];
           //dpm($results, 'Results Updated');
-        }
-        else {
+        } else {
           //dpm('No matches for this field, skipping.', 'Skip Adding to
           // Results');
         }
       }
 
 
-        // Replace (and check to see if already processed).
+      // Replace (and check to see if already processed).
       elseif (!isset($processed[$field][$row->nid][$row->delta])) {
         // Check first if pathauto_persist, a newer version of pathauto, or some
         // other module has already set $node->path['pathauto']. If not, set it
@@ -514,7 +519,7 @@ function _scanner_execute($searchtype = 'search') {
         // node_save()) if a custom alias exists that doesn't follow pathauto
         // rules.
         if (!isset($node->path['pathauto']) && module_exists('pathauto') && $pathauto) {
-          [$id, , $bundle] = entity_extract_ids('node', $node);
+          [$id,, $bundle] = entity_extract_ids('node', $node);
           if (!empty($id)) {
             module_load_include('inc', 'pathauto');
             $uri = entity_uri('node', $node);
@@ -527,68 +532,93 @@ function _scanner_execute($searchtype = 'search') {
         $hits = 0;
         preg_match('/(.+)_' . $suffix . '$/', $field, $matches);
 
+
         // Paragraphs.
+        $processed_paragraphs = []; // Keep track of saved paragraphs.
+
         if (strpos($type, 'paragraph:') !== FALSE) {
-          // Load the paragraph entity.
           $paragraph = paragraphs_item_load($row->entity_id);
+          //dpm($paragraph);
           if (!$paragraph) {
-            backdrop_set_message(t('Failed to load paragraph with ID %id', ['%id' => $row->entity_id]), 'error');
+            backdrop_set_message(t('Failed to load paragraph with ID %id.', ['%id' => $row->entity_id]), 'error');
             continue;
           }
 
-          // Extract the base field name from the full field name (e.g., "field_text_in_the_paragraph").
           preg_match('/(.+)_value$/', $field, $matches);
           $base_field_name = $matches[1] ?? $field;
 
-          // Validate the existence of the base field in the paragraph entity.
           if (!isset($paragraph->{$base_field_name})) {
-            backdrop_set_message(t('Field %field does not exist on paragraph %id', [
+            backdrop_set_message(t('Field %field does not exist on paragraph %id.', [
               '%field' => $base_field_name,
               '%id' => $row->entity_id,
             ]), 'warning');
             continue;
           }
 
-          // Prepare replacement.
+          $old_paragraph_vid = $paragraph->revision_id;
+          //dpm($old_paragraph_vid);
+
+          if (!isset($undo_data[$node->nid])) {
+            $undo_data[$node->nid] = [
+              'old_vid' => $node->vid,
+              'paragraphs' => [],
+            ];
+          }
+          $undo_data[$node->nid]['paragraphs'][$paragraph->id()] = [
+            'old_vid' => $old_paragraph_vid,
+          ];
+
           $hits = 0;
           $field_data = &$paragraph->{$base_field_name};
-
           foreach ($field_data as $langcode => &$values) {
             foreach ($values as &$value) {
               if (isset($value['value'])) {
                 $value['value'] = preg_replace($regexstr, $replace, $value['value'], -1, $hit_count);
                 $hits += $hit_count;
               }
-
-              if (isset($value['summary'])) {
-                $value['summary'] = preg_replace($regexstr, $replace, $value['summary'], -1, $hit_count);
+              if (isset($value['safe_value'])) {
+                $value['safe_value'] = preg_replace($regexstr, $replace, $value['safe_value'], -1, $hit_count);
                 $hits += $hit_count;
               }
             }
           }
 
-          // Update the paragraph's host entity dynamically and save the paragraph.
-          $host_node = $paragraph->hostEntity();
-          if ($host_node) {
-            $paragraph->setHostEntity('node', $host_node);
+          if ($hits > 0 && !isset($processed_paragraphs[$paragraph->id()])) {
+            $paragraph->revision = TRUE;
+            $paragraph->save();
+
+            $new_paragraph_vid = db_query("SELECT revision_id FROM {paragraphs_item} WHERE item_id = :item_id", [
+              ':item_id' => $paragraph->id(),
+            ])->fetchField();
+
+            if ($new_paragraph_vid) {
+              $undo_data[$node->nid]['paragraphs'][$paragraph->id()]['new_vid'] = $new_paragraph_vid;
+              foreach ($node->{$field_name} as $langcode => &$paragraphs) {
+                foreach ($paragraphs as &$paragraph_field_item) {
+                  if ($paragraph_field_item['value'] == $paragraph->id()) {
+                    $paragraph_field_item['revision_id'] = $new_paragraph_vid;
+                  }
+                }
+              }
+            }
+
+            $processed_paragraphs[$paragraph->id()] = TRUE;
+
+            $results[] = [
+              'title' => $node->title ?? 'Unknown Host',
+              'nid' => $node->nid ?? 'N/A',
+              'type' => $type,
+              'count' => $hits,
+              'field' => $field,
+              'field_label' => $field_label,
+            ];
+          } else {
+            backdrop_set_message(t('No changes detected for paragraph ID %id.', ['%id' => $paragraph->id()]));
           }
-
-          $paragraph->save();
-
-          // Add results for logging.
-          $results[] = [
-            'title' => $host_node->title ?? 'Unknown Host',
-            'nid' => $host_node->nid ?? 'N/A',
-            'type' => $type,
-            'count' => $hits,
-            'field' => $field,
-            'field_label' => $field_label,
-          ];
-
-          continue;
         }
 
-        // Field collections.
+
+        // Handle field collections (unchanged from your original code).
         if (!empty($field_collection_parents)) {
           foreach ($node->{$field_collection_parents[0]} as $fc_lang => $fc_data) {
             foreach ($fc_data as $key => $fc_item) {
@@ -602,7 +632,7 @@ function _scanner_execute($searchtype = 'search') {
                   $fc->{$matches[1]}[LANGUAGE_NONE][$fc_key][$suffix] = $fc_content;
                 }
 
-                // Also need to handle the summary part of text+summary fields.
+                // Also handle the summary part of text+summary fields.
                 if (isset($fc_val['summary'])) {
                   $summary_hits = 0;
                   $fc_summary = preg_replace($regexstr, $replace, $fc_val['summary'], -1, $summary_hits);
@@ -625,20 +655,12 @@ function _scanner_execute($searchtype = 'search') {
                 }
               }
 
-              // If field collection revision handling is enabled, update the
-              // revision ID on the field.
-              // @todo Handle scenarios were the same FC is updated multiple
-              // times on the same request.
+              // Update field collection revision ID if necessary.
               if ($fc_revision_field == 'revision_id') {
                 $fc->revision = 1;
               }
 
-              // Update the field collection.
               $fc->save(TRUE);
-
-              // If field collection revision handling is enabled, update the
-              // revision ID on the field; the entity's revision_id is updated
-              // during the save() method, so this is safe to do.
               if ($fc_revision_field == 'revision_id') {
                 $node->{$field_collection_parents[0]}[$fc_lang][$key]['revision_id'] = $fc->revision_id;
               }
@@ -646,23 +668,18 @@ function _scanner_execute($searchtype = 'search') {
           }
         }
 
-        // Normal node fields.
+        // Normal node fields (unchanged from your original code).
         else {
-          // Skip processing if this is a paragraph field.
-          if (strpos($type, 'paragraph:') !== FALSE) {
+          if (strpos($type, 'paragraph') !== FALSE) {
             continue;
           }
 
-          // Normal node fields.
           $hits = 0;
-
-          // Trigger hook_scanner_preg_replace().
           foreach (module_implements('scanner_preg_replace') as $module_name) {
             $function = $module_name . '_scanner_preg_replace';
             $hits += $function($node, $field, $matches, $row, $regexstr, $replace);
           }
 
-          // Update the counter.
           $results[] = [
             'title' => $node->title,
             'nid' => $node->nid,
@@ -671,7 +688,10 @@ function _scanner_execute($searchtype = 'search') {
             'field' => $field,
             'field_label' => $field_label,
           ];
+          //dpm($results);
         }
+
+        //dpm($node);
 
         // A revision only created for the first change of the node. Subsequent
         // changes of the same node do not generate additional revisions.
@@ -693,6 +713,30 @@ function _scanner_execute($searchtype = 'search') {
         // Undo data construction.
         // Now set to updated vid after node_save().
         $undo_data[$node->nid]['new_vid'] = $node->vid;
+
+        // Update paragraph revisions in the undo data.
+        foreach ($node as $field_name => $field_value) {
+          // Check if this field is a paragraph field.
+          $field_info = field_info_field($field_name);
+          if ($field_info && $field_info['type'] === 'paragraphs') {
+            if (!empty($node->{$field_name}['und'])) {
+              foreach ($node->{$field_name}['und'] as $paragraph_ref) {
+                $paragraph = entity_load('paragraphs_item', [$paragraph_ref['value']]);
+                if (!empty($paragraph)) {
+                  $paragraph = reset($paragraph); // Get the loaded entity.
+
+                  // Update the paragraph's new_vid after node save.
+                  $undo_data[$node->nid]['paragraphs'][$paragraph->item_id]['new_vid'] = $paragraph->revision_id;
+                }
+              }
+            }
+          }
+        }
+
+
+        // Debugging outputs to verify the results.
+        //dpm($node);
+        //dpm($undo_data);
       }
     }
   }
@@ -712,7 +756,7 @@ function _scanner_execute($searchtype = 'search') {
   else {
     // Ensure $undo_data is initialized as an array if it is null or undefined.
     $undo_data = $undo_data ?? [];
-
+    //dpm($undo_data);
     if (count($undo_data) && !$shutting_down) {
       db_insert('scanner')
         ->fields([
@@ -728,7 +772,6 @@ function _scanner_execute($searchtype = 'search') {
 
     return theme('scanner_replace_results', ['results' => $results]);
   }
-
 }
 
 /**
@@ -753,7 +796,8 @@ function _scanner_execute($searchtype = 'search') {
  *   List of all fields, each of which is an array containing relevant data
  *   used for displaying/querying.
  */
-function _scanner_get_all_tables_map() {
+function _scanner_get_all_tables_map()
+{
   $tables_map = [];
 
   // Add node fields, including the title.
@@ -816,7 +860,8 @@ function _scanner_get_all_tables_map() {
  * @return array
  *   Map of selected fields and tables.
  */
-function _scanner_get_selected_tables_map() {
+function _scanner_get_selected_tables_map()
+{
   $tables_map = _scanner_get_all_tables_map();
   //dpm($tables_map);
   $config = config('scanner.settings');

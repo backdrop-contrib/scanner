@@ -19,7 +19,8 @@ define('SCANNER_STATUS_GO_REPLACE', 3);
 /**
  * Implements hook_config_info().
  */
-function scanner_config_info() {
+function scanner_config_info()
+{
   return [
     'scanner.settings' => [
       'label' => t('Search and Replace Scanner Settings'),
@@ -31,7 +32,8 @@ function scanner_config_info() {
 /**
  * Implements hook_menu().
  */
-function scanner_menu() {
+function scanner_menu()
+{
   $items['admin/content/scanner'] = array(
     'title' => 'Search and Replace Scanner',
     'description' => 'Find (and replace) keywords in all your content.',
@@ -83,7 +85,8 @@ function scanner_menu() {
 /**
  * Implements hook_theme().
  */
-function scanner_theme() {
+function scanner_theme()
+{
   return array(
     'scanner_results' => array(
       'file' => 'scanner.theme.inc',
@@ -115,7 +118,8 @@ function scanner_theme() {
 /**
  * Implements hook_permission().
  */
-function scanner_permission() {
+function scanner_permission()
+{
   return array(
     'administer scanner settings' => array(
       'title' => t('Administer scanner settings'),
@@ -132,7 +136,8 @@ function scanner_permission() {
 /**
  * Implements hook_scanner_query_where().
  */
-function scanner_scanner_query_where(&$or, $table, $field, $where, $binary) {
+function scanner_scanner_query_where(&$or, $table, $field, $where, $binary)
+{
   // Base field.
   $or->condition('t.' . $field, $where, 'REGEXP' . $binary);
 }
@@ -140,14 +145,24 @@ function scanner_scanner_query_where(&$or, $table, $field, $where, $binary) {
 /**
  * Implements hook_scanner_preg_match_all().
  */
-function scanner_scanner_preg_match_all(&$matches, $regexstr, $row) {
+function scanner_scanner_preg_match_all(&$matches, $regexstr, $row)
+{
   return preg_match_all($regexstr, $row->content, $matches, PREG_OFFSET_CAPTURE);
 }
 
 /**
  * Implements hook_scanner_preg_replace().
  */
-function scanner_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace) {
+function scanner_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace)
+{
+
+  //dpm($node);
+  //dpm($field);
+  //dpm($matches);
+  //dpm($row);
+  //dpm($regexstr);
+  //dpm($replace);
+
   $language = NULL;
   $hits = 0;
   $old_value = NULL;
@@ -158,8 +173,7 @@ function scanner_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr,
     if (isset($node->{$matches[1]}[$language][$row->delta]['value'])) {
       $old_value = $node->{$matches[1]}[$language][$row->delta]['value'];
     }
-  }
-  else {
+  } else {
     $old_value = $node->{$field};
   }
 
@@ -173,8 +187,7 @@ function scanner_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr,
     if (isset($node->{$matches[1]}[$language][$row->delta]['value'])) {
       $node->{$matches[1]}[$language][$row->delta]['value'] = $new_value;
     }
-  }
-  else {
+  } else {
     $node->{$field} = $new_value;
   }
   return $hits;
@@ -183,7 +196,8 @@ function scanner_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr,
 /**
  * Implements hook_scanner_fields_alter().
  */
-function field_collection_scanner_fields_alter(array &$all_field_records, $node_bundle = NULL, $parent_bundle = NULL, $parents = NULL) {
+function field_collection_scanner_fields_alter(array &$all_field_records, $node_bundle = NULL, $parent_bundle = NULL, $parents = NULL)
+{
   // On behalf of field_collection.module.
 
   // Load all field instances from configuration.
@@ -225,7 +239,8 @@ function field_collection_scanner_fields_alter(array &$all_field_records, $node_
 /**
  * Implements hook_scanner_field_types().
  */
-function link_scanner_field_types() {
+function link_scanner_field_types()
+{
   // Performed on behalf of link.module.
   return array('link');
 }
@@ -233,7 +248,8 @@ function link_scanner_field_types() {
 /**
  * Implements hook_scanner_field_suffix_alter().
  */
-function link_scanner_field_suffix_alter(&$suffix, $map) {
+function link_scanner_field_suffix_alter(&$suffix, $map)
+{
   // Performed on behalf of link.module.
   if (isset($map['module']) && $map['module'] == 'link') {
     $suffix = 'title';
@@ -243,7 +259,8 @@ function link_scanner_field_suffix_alter(&$suffix, $map) {
 /**
  * Implements hook_scanner_query_where().
  */
-function link_scanner_query_where(&$or, $table, $field, $where, $binary) {
+function link_scanner_query_where(&$or, $table, $field, $where, $binary)
+{
   // Performed on behalf of link.module.
   if (strpos($field, '_title') != FALSE) {
     $field_url = rtrim($field, '_title') . '_url';
@@ -256,7 +273,8 @@ function link_scanner_query_where(&$or, $table, $field, $where, $binary) {
 /**
  * Implements hook_scanner_preg_replace().
  */
-function link_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace) {
+function link_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace)
+{
   // Performed on behalf of link.module.
   $hits = 0;
 
@@ -283,7 +301,8 @@ function link_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $r
 /**
  * Implements hook_scanner_query_alter().
  */
-function node_scanner_query_alter(&$query, $map, $table, $field) {
+function node_scanner_query_alter(&$query, $map, $table, $field)
+{
   // Performed on behalf of node.module.
   $query->condition('n.status', '1', '=');
 }
@@ -291,7 +310,8 @@ function node_scanner_query_alter(&$query, $map, $table, $field) {
 /**
  * Implements hook_scanner_field_types().
  */
-function text_scanner_field_types() {
+function text_scanner_field_types()
+{
   // Performed on behalf of text.module.
   return array('text');
 }
@@ -299,7 +319,8 @@ function text_scanner_field_types() {
 /**
  * Implements hook_scanner_query_where().
  */
-function text_scanner_query_where(&$or, $table, $field, $where, $binary) {
+function text_scanner_query_where(&$or, $table, $field, $where, $binary)
+{
   // Performed on behalf of text.module.
   $field_summary = rtrim($field, '_value') . '_summary';
   if (db_field_exists($table, $field_summary)) {
@@ -310,7 +331,8 @@ function text_scanner_query_where(&$or, $table, $field, $where, $binary) {
 /**
  * Implements hook_scanner_query_alter().
  */
-function text_scanner_query_alter(&$query, $map, $table, $field) {
+function text_scanner_query_alter(&$query, $map, $table, $field)
+{
   // Performed on behalf of text.module.
   $summary_field = rtrim($field, '_value') . '_summary';
 
@@ -323,7 +345,8 @@ function text_scanner_query_alter(&$query, $map, $table, $field) {
 /**
  * Implements hook_scanner_preg_match_all().
  */
-function text_scanner_preg_match_all(&$matches, $regexstr, $row) {
+function text_scanner_preg_match_all(&$matches, $regexstr, $row)
+{
   // Performed on behalf of text.module.
   if (!empty($row->summary)) {
     return preg_match_all($regexstr, $row->summary, $matches, PREG_OFFSET_CAPTURE);
@@ -334,7 +357,8 @@ function text_scanner_preg_match_all(&$matches, $regexstr, $row) {
 /**
  * Implements hook_scanner_preg_replace().
  */
-function text_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace) {
+function text_scanner_preg_replace(&$node, $field, $matches, $row, $regexstr, $replace)
+{
   // Performed on behalf of text.module.
   $hits = 0;
 

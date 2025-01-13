@@ -11,7 +11,8 @@ include_once 'scanner.inc';
 /**
  * The main settings form.
  */
-function scanner_admin_form($form, &$form_state) {
+function scanner_admin_form($form, &$form_state)
+{
   $config = config('scanner.settings');
 
   $form['settings'] = array(
@@ -91,7 +92,8 @@ function scanner_admin_form($form, &$form_state) {
 /**
  * Submit handler for scanner_admin_form.
  */
-function scanner_admin_form_submit($form, &$form_state) {
+function scanner_admin_form_submit($form, &$form_state)
+{
   $config = config('scanner.settings');
   $config->set('scanner_mode', $form_state['values']['scanner_mode']);
   $config->set('scanner_wholeword', $form_state['values']['scanner_wholeword']);
@@ -112,6 +114,3 @@ function scanner_admin_form_submit($form, &$form_state) {
 
   $config->save();
 }
-
-
-
