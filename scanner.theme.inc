@@ -8,7 +8,8 @@
 /**
  * Theme the search results.
  */
-function theme_scanner_results($variables) {
+function theme_scanner_results($variables)
+{
   $results = $variables['results'];
   $output = NULL;
   if (is_array($results)) {
@@ -22,8 +23,7 @@ function theme_scanner_results($variables) {
     }
     $output .= '</ol>';
     // @todo use pager to split up results.
-  }
-  else {
+  } else {
     backdrop_set_message(t('No matches found. Check the !url for fields that can be searched.', ['!url' => l(t('settings'), 'admin/config/content/scanner')]), 'warning');
   }
 
@@ -33,7 +33,8 @@ function theme_scanner_results($variables) {
 /**
  * Theme each search result hit.
  */
-function theme_scanner_item($variables) {
+function theme_scanner_item($variables)
+{
   $output = '';
   $item = $variables['item'];
   $item['count'] = $item['count']; // No need to handle 0 cases anymore.
@@ -69,7 +70,8 @@ function theme_scanner_item($variables) {
 /**
  * Theme the replace results.
  */
-function theme_scanner_replace_results($variables) {
+function theme_scanner_replace_results($variables)
+{
   $results = $variables['results'];
   $output = '';
   if (is_array($results)) {
@@ -81,8 +83,7 @@ function theme_scanner_replace_results($variables) {
     }
     $output .= '</ol>';
     // @todo use pager to split up results.
-  }
-  else {
+  } else {
     backdrop_set_message(t('No matches found. Check the !url for fields that can be searched.', ['!url' => l(t('settings'), 'admin/config/content/scanner')]), 'warning');
   }
 
@@ -92,7 +93,8 @@ function theme_scanner_replace_results($variables) {
 /**
  * Theme each replace result hit.
  */
-function theme_scanner_replace_item($variables) {
+function theme_scanner_replace_item($variables)
+{
   $output = '';
   $item = $variables['item'];
   $item['count'] = $item['count'] > 0 ? $item['count'] : 'One or more';

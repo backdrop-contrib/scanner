@@ -6,7 +6,8 @@ include_once 'scanner.inc';
 /**
  * Form constructor for the confirmation form.
  */
-function scanner_confirm_form($form, &$form_state) {
+function scanner_confirm_form($form, &$form_state)
+{
   $form = array();
 
   $form['#attached']['js'][] = backdrop_get_path('module', 'scanner') . '/scanner.js';
@@ -85,7 +86,8 @@ function scanner_confirm_form($form, &$form_state) {
 /**
  * Form submission handler for scanner_confirm_form().
  */
-function scanner_confirm_form_submit($form, &$form_state) {
+function scanner_confirm_form_submit($form, &$form_state)
+{
   if ($form_state['values']['op'] == t('Yes, Continue')) {
     $_SESSION['scanner_status'] = SCANNER_STATUS_GO_REPLACE;
   } else {
@@ -98,7 +100,8 @@ function scanner_confirm_form_submit($form, &$form_state) {
 /**
  * Form submission handler for the cancel button in scanner_confirm_form().
  */
-function scanner_confirm_form_cancel_submit($form, &$form_state) {
+function scanner_confirm_form_cancel_submit($form, &$form_state)
+{
   unset($_SESSION['scanner_status']);
   $form_state['redirect'] = 'admin/content/scanner';
 }
@@ -106,7 +109,8 @@ function scanner_confirm_form_cancel_submit($form, &$form_state) {
 /**
  * Form constructor for the search and replace form.
  */
-function scanner_form($form, &$form_state) {
+function scanner_form($form, &$form_state)
+{
   $form = array();
 
   if (isset($_SESSION['scanner_search'])) {
@@ -280,7 +284,8 @@ function scanner_form($form, &$form_state) {
 /**
  * Form validation handler for scanner_form().
  */
-function scanner_form_validate($form, &$form_state) {
+function scanner_form_validate($form, &$form_state)
+{
   $search = trim($form_state['values']['search']);
   if ($search == '') {
     form_set_error('search', t('Please enter some keywords.'));
@@ -290,7 +295,8 @@ function scanner_form_validate($form, &$form_state) {
 /**
  * Form submission handler for scanner_form().
  */
-function scanner_form_submit($form, &$form_state) {
+function scanner_form_submit($form, &$form_state)
+{
   // Save form input into session.
   $_SESSION['scanner_search']   = $form_state['values']['search'];
   $_SESSION['scanner_preceded'] = $form_state['values']['preceded'];
@@ -316,7 +322,8 @@ function scanner_form_submit($form, &$form_state) {
 /**
  * Display table of executed replace actions with undo/redo operation.
  */
-function scanner_undo_page() {
+function scanner_undo_page()
+{
   $header = array(
     t('Date'),
     t('Searched'),
@@ -371,7 +378,8 @@ function scanner_undo_page() {
 /**
  * Form constructor for the undo confirmation form.
  */
-function scanner_undo_confirm_form($form, &$form_state) {
+function scanner_undo_confirm_form($form, &$form_state)
+{
   $undo_id = $_GET['undo_id'];
 
   if ($undo_id > 0) {
@@ -407,7 +415,6 @@ function scanner_undo_confirm_form($form, &$form_state) {
       '#value' => t('No, Cancel'),
       '#submit' => array('scanner_undo_confirm_form_cancel_submit'),
     );
-
   } else {
     $form['info'] = array(
       '#markup' => '<h2>' . t('No undo event was found') . '</h2>',
@@ -420,7 +427,8 @@ function scanner_undo_confirm_form($form, &$form_state) {
 /**
  * Form submission handler for the confirm button.
  */
-function scanner_undo_confirm_form_submit($form, &$form_state) {
+function scanner_undo_confirm_form_submit($form, &$form_state)
+{
   if ($form_state['values']['op'] == t('Yes, Continue')) {
     // Fetch the undo data.
     $undo = db_select('scanner', 's')
@@ -439,6 +447,9 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
     $new_undone_value = ($undo->undone == 0) ? 1 : 0;
 
     foreach ($undos as $nid => $sandr_event) {
+      dpm($sandr_event);
+
+      // Revert the node to the specified revision.
       $vid = ($undo->undone == 0) ? $sandr_event['old_vid'] : $sandr_event['new_vid'];
       $node = node_load($nid, $vid);
 
@@ -454,6 +465,86 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
 
         node_save($node);
         $count++;
+        // Handle paragraphs within the node.
+        if (!empty($sandr_event['paragraphs'])) {
+          foreach ($sandr_event['paragraphs'] as $paragraph_id => $paragraph_event) {
+            $paragraph_old_vid = ($undo->undone == 0) ? $paragraph_event['old_vid'] : $paragraph_event['new_vid'];
+
+            // Fetch the bundle for the paragraph dynamically.
+            $paragraph_bundle = db_query("SELECT bundle FROM {paragraphs_item} WHERE item_id = :item_id", [
+              ':item_id' => $paragraph_id,
+            ])->fetchField();
+
+            if (!$paragraph_bundle) {
+              backdrop_set_message(t('Failed to retrieve the bundle for paragraph ID @id.', ['@id' => $paragraph_id]), 'error');
+              continue;
+            }
+
+            // Step 1: Update the paragraph revision ID in the paragraphs_item table.
+            db_update('paragraphs_item')
+              ->fields(['revision_id' => $paragraph_old_vid])
+              ->condition('item_id', $paragraph_id)
+              ->execute();
+
+            // Step 2: Update the field_data_* table for the paragraph reference field dynamically.
+            $field_instances = field_info_instances('node', $node->type);
+
+            foreach ($field_instances as $field_name => $instance) {
+              $field_info = field_info_field($field_name);
+
+              // Check if this field is a paragraphs reference field.
+              if ($field_info['type'] === 'paragraphs') {
+                // Find and update the field_data_* table for this field.
+                db_update("field_data_$field_name")
+                  ->fields(['field_paragraphs_revision_id' => $paragraph_old_vid])
+                  ->condition('field_paragraphs_value', $paragraph_id)
+                  ->execute();
+              }
+            }
+
+            // Step 3: Sync the field_data_* table with the field_revision_* table for the paragraph fields.
+            $fields = field_info_instances('paragraphs_item', $paragraph_bundle);
+            foreach ($fields as $field_name => $field_instance) {
+              if (strpos($field_name, 'field_') === 0) {
+                // Fetch the field data from field_revision_* for the old revision ID.
+                $field_data = db_query("SELECT * FROM {field_revision_$field_name} WHERE entity_id = :entity_id AND revision_id = :revision_id", [
+                  ':entity_id' => $paragraph_id,
+                  ':revision_id' => $paragraph_old_vid,
+                ])->fetchAllAssoc('delta');
+
+                // Update the field_data_* table with the values from field_revision_*.
+                foreach ($field_data as $delta => $data) {
+                  $update_fields = [];
+                  foreach ($data as $column => $value) {
+                    if (!in_array($column, ['revision_id', 'entity_id', 'delta'])) {
+                      $update_fields[$column] = $value;
+                    }
+                  }
+
+                  // Perform the update on the field_data_* table.
+                  db_update("field_data_$field_name")
+                    ->fields($update_fields)
+                    ->condition('entity_id', $paragraph_id)
+                    ->condition('delta', $delta)
+                    ->execute();
+                }
+              }
+            }
+
+            // Step 4: Validate the paragraph's revision update.
+            $current_revision_id = db_query("SELECT revision_id FROM {paragraphs_item} WHERE item_id = :item_id", [
+              ':item_id' => $paragraph_id,
+            ])->fetchField();
+
+            if ($current_revision_id != $paragraph_old_vid) {
+              backdrop_set_message(t('Paragraph ID @id has a mismatched revision ID: expected @expected, found @found.', [
+                '@id' => $paragraph_id,
+                '@expected' => $paragraph_old_vid,
+                '@found' => $current_revision_id,
+              ]), 'warning');
+            }
+          }
+        }
       }
     }
 
@@ -464,8 +555,7 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
       ->execute();
 
     backdrop_set_message(t('@count nodes reverted.', ['@count' => $count]));
-  }
-  else {
+  } else {
     backdrop_set_message(t('Undo / Redo canceled'));
   }
 
@@ -476,7 +566,8 @@ function scanner_undo_confirm_form_submit($form, &$form_state) {
 /**
  * Form submission handler for the cancel button.
  */
-function scanner_undo_confirm_form_cancel_submit($form, &$form_state) {
+function scanner_undo_confirm_form_cancel_submit($form, &$form_state)
+{
   backdrop_set_message(t('Undo / Redo canceled'));
   $form_state['redirect'] = 'admin/content/scanner/undo';
 }
@@ -484,7 +575,8 @@ function scanner_undo_confirm_form_cancel_submit($form, &$form_state) {
 /**
  * Menu callback; presents the scan form and results.
  */
-function scanner_view() {
+function scanner_view()
+{
   $output = '';
 
   backdrop_add_css('
