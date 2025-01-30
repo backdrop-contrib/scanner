@@ -447,7 +447,7 @@ function scanner_undo_confirm_form_submit($form, &$form_state)
     $new_undone_value = ($undo->undone == 0) ? 1 : 0;
 
     foreach ($undos as $nid => $sandr_event) {
-      dpm($sandr_event);
+      //dpm($sandr_event);
 
       // Revert the node to the specified revision.
       $vid = ($undo->undone == 0) ? $sandr_event['old_vid'] : $sandr_event['new_vid'];
