@@ -6,6 +6,29 @@
  */
 
 /**
+ * Polyfill for PHP 8.0's str_ends_with() function.
+ */
+if (!function_exists('str_ends_with')) {
+  /**
+   * Checks if a string ends with a given substring.
+   *
+   * @param string $haystack
+   *   The string to search in.
+   * @param string $needle
+   *   The substring to search for.
+   *
+   * @return bool
+   *   TRUE if haystack ends with needle, FALSE otherwise.
+   */
+  function str_ends_with($haystack, $needle) {
+    if ($needle === '') {
+      return true;
+    }
+    return substr_compare($haystack, $needle, -strlen($needle)) === 0;
+  }
+}
+
+/**
  * Attempt to stretch the amount of time available for processing.
  *
  * This way timeouts won't interrupt search and replace actions. This only works
@@ -136,10 +159,6 @@ function _scanner_execute($searchtype = 'search')
   $terms = $_SESSION['scanner_terms'] ?? NULL;
   $results = NULL;
 
-  //dpm($_SESSION, 'Session Data');
-  //dpm($flag);
-
-
   if ($searchtype == 'search') {
     backdrop_set_message(t('Searching for: [%search] ...', ['%search' => $search]));
   }
@@ -188,21 +207,16 @@ function _scanner_execute($searchtype = 'search')
     $search_php = $preceded_php . addcslashes($search, SCANNER_REGEX_CHARS) . $followed_php;
   }
 
-  // If terms selected, then put together extra join and where clause.
-  $join = '';
+  // If terms selected, then put together extra where clause.
   if (is_array($terms) && count($terms)) {
     $terms_where = [];
-    $terms_params = [];
     foreach ($terms as $term) {
       $terms_where[] = 'tn.tid = %d';
-      $terms_params[] = $term;
     }
-    $join = 'INNER JOIN {taxonomy_term_node} tn ON t.nid = tn.nid';
     $where .= ' AND (' . implode(' OR ', $terms_where) . ')';
   }
 
   $table_map = _scanner_get_selected_tables_map();
-  //dpm($table_map);
   usort($table_map, '_scanner_compare_fields_by_name');
 
   // Examine each field instance as chosen in settings.
@@ -211,7 +225,6 @@ function _scanner_execute($searchtype = 'search')
     $field = $map['field'];
     $field_label = $map['field_label'];
     $type = $map['type'];
-    $module = $map['module'] ?? NULL;
     $field_collection_parents = $map['field_collection_parents'] ?? NULL;
 
     // Allow the table suffix to be altered.
@@ -337,23 +350,9 @@ function _scanner_execute($searchtype = 'search')
       if (empty($search_term)) {
         throw new Exception('Search term is required but not provided.');
       }
-      //dpm($search_term, 'Search Term');
-
-      // Properly construct the CONVERT statement with enforced spacing.
-      $charset_conversion = "CONVERT(t.$field USING utf8mb4)";
-      //dpm($charset_conversion, 'Charset Conversion');
-
+      
       // Build the base where condition.
       $query->where("(CONVERT(t.$field USING utf8mb4) REGEXP :search_term)", [':search_term' => $search_term]);
-
-      // Check if a summary field exists and add its condition directly.
-      if (!empty($summary_field)) {
-        $query->where("(CONVERT(t.$summary_field USING utf8mb4) REGEXP :search_term)", [':search_term' => $search_term]);
-      }
-
-      // Add debugging to ensure conditions are constructed correctly.
-      //dpm((string) $query, 'Query After Adding Conditions');
-
 
       if ($published) {
         $query->condition('n.status', '1', '=');
@@ -364,16 +363,11 @@ function _scanner_execute($searchtype = 'search')
     // Triggers hook_scanner_query_alter().
     // Allow the query to be modified.
     backdrop_alter('scanner_query', $query, $map, $table, $field);
-    // Debug the constructed SQL query.
-    //dpm($field_name, 'Dynamic Paragraph Field Name');
-
-    //dpm((string) $query, 'Constructed SQL Query');
     $result = $query->execute();
     $shutting_down = FALSE;
 
     // Perform the search or replace on each hit for the current field instance.
     foreach ($result as $row) {
-      //dpm($row);
       // Results of an entity property, e.g. the node title, won't have a
       // 'delta' attribute, so make sure there is one.
       if (!isset($row->delta)) {
@@ -417,12 +411,8 @@ function _scanner_execute($searchtype = 'search')
 
       $node = node_load($row->nid);
 
-      //dpm($content, 'Search Target');
-      //dpm($flag, 'Regex Flag');
-
       // Build the regular expression used later.
       $regexstr = "/$search_php/$flag";
-      //dpm($regexstr);
 
       // Search.
       if ($searchtype == 'search') {
@@ -444,7 +434,6 @@ function _scanner_execute($searchtype = 'search')
           foreach ($matches as $key => $item) {
             $string = $key == 0 ? $content : $summary;
             foreach ($item as $match) {
-              //dpm($match, "Individual Match");
               $text .= '<li>';
               // If ($key == 1) {
               // $text .= '<i>Summary:</i> ';
@@ -503,10 +492,6 @@ function _scanner_execute($searchtype = 'search')
             'nid' => $row->nid,
             'text' => $text,
           ];
-          //dpm($results, 'Results Updated');
-        } else {
-          //dpm('No matches for this field, skipping.', 'Skip Adding to
-          // Results');
         }
       }
 
@@ -538,7 +523,6 @@ function _scanner_execute($searchtype = 'search')
 
         if (strpos($type, 'paragraph:') !== FALSE) {
           $paragraph = paragraphs_item_load($row->entity_id);
-          //dpm($paragraph);
           if (!$paragraph) {
             backdrop_set_message(t('Failed to load paragraph with ID %id.', ['%id' => $row->entity_id]), 'error');
             continue;
@@ -556,7 +540,6 @@ function _scanner_execute($searchtype = 'search')
           }
 
           $old_paragraph_vid = $paragraph->revision_id;
-          //dpm($old_paragraph_vid);
 
           if (!isset($undo_data[$node->nid])) {
             $undo_data[$node->nid] = [
@@ -688,10 +671,7 @@ function _scanner_execute($searchtype = 'search')
             'field' => $field,
             'field_label' => $field_label,
           ];
-          //dpm($results);
-        }
-
-        //dpm($node);
+                    }
 
         // A revision only created for the first change of the node. Subsequent
         // changes of the same node do not generate additional revisions.
@@ -732,11 +712,6 @@ function _scanner_execute($searchtype = 'search')
             }
           }
         }
-
-
-        // Debugging outputs to verify the results.
-        //dpm($node);
-        //dpm($undo_data);
       }
     }
   }
@@ -752,11 +727,9 @@ function _scanner_execute($searchtype = 'search')
     return theme('scanner_results', ['results' => $results]);
   }
   // Searchtype == 'replace'.
-  // Searchtype == 'replace'.
   else {
     // Ensure $undo_data is initialized as an array if it is null or undefined.
     $undo_data = $undo_data ?? [];
-    //dpm($undo_data);
     if (count($undo_data) && !$shutting_down) {
       db_insert('scanner')
         ->fields([
@@ -773,21 +746,6 @@ function _scanner_execute($searchtype = 'search')
     return theme('scanner_replace_results', ['results' => $results]);
   }
 }
-
-/**
- * Get all text fields.
- *
- * @return array
- *   List of all fields, each of which is an array containing relevant data
- *   used for diplaying/querying.
- */
-/**
- * Get all text fields.
- *
- * @return array
- *   List of all fields, each of which is an array containing relevant data
- *   used for displaying/querying.
- */
 
 /**
  * Get all text fields.
@@ -844,7 +802,6 @@ function _scanner_get_all_tables_map()
   // Trigger hook_scanner_fields_alter().
   backdrop_alter('scanner_fields', $tables_map);
 
-  //dpm($tables_map);
   return $tables_map;
 }
 
@@ -854,16 +811,9 @@ function _scanner_get_all_tables_map()
  * @return array
  *   Map of selected fields and tables.
  */
-/**
- * Get the fields that have been selected for scanning.
- *
- * @return array
- *   Map of selected fields and tables.
- */
 function _scanner_get_selected_tables_map()
 {
   $tables_map = _scanner_get_all_tables_map();
-  //dpm($tables_map);
   $config = config('scanner.settings');
 
   /*foreach ($tables_map as $i => $item) {
@@ -890,7 +840,6 @@ function _scanner_get_selected_tables_map()
     }
   }
 
-  //dpm($tables_map);
   // Reindex array to maintain order and avoid gaps.
   return array_values($tables_map);
 }
